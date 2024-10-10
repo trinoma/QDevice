@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace
+namespace 
 {
     inline qd_chars create_chars(const std::string& src)
     {
@@ -120,10 +120,10 @@ namespace
 
     std::optional<std::string> find_property_value(const std::string& name, const qd_properties& properties)
     {
-        for (std::size_t i = 0; i < properties.size; i++)
+        for(std::size_t i = 0; i < properties.size; i++)
         {
             const auto& prop = properties.data[i];
-            if (std::string(prop.name.data, prop.name.size) == name)
+            if(std::string(prop.name.data, prop.name.size) == name)
             {
                 return std::string{ prop.value.value.data, prop.value.value.size };
             }
@@ -150,7 +150,7 @@ namespace
 namespace QDevice::Utilities
 {
     inline qd_property create_property(
-        const std::string& name,
+        const std::string& name, 
         bool readOnly,
         qd_property_type type,
         const std::string& value,
@@ -167,9 +167,9 @@ namespace QDevice::Utilities
     }
 
     inline qd_channel create_channel(
-        const std::string& name,
-        qd_sample_encoding dataType,
-        qd_channel_unit unit,
+        const std::string& name, 
+        qd_sample_encoding dataType, 
+        qd_channel_unit unit, 
         float frequency)
     {
         return {
@@ -182,8 +182,8 @@ namespace QDevice::Utilities
 
     inline qd_device create_device(
         qd_device_category category,
-        const std::string& serialNumber,
-        std::size_t nChannels,
+        const std::string& serialNumber, 
+        std::size_t nChannels, 
         std::size_t nProperties)
     {
         return {
@@ -255,7 +255,7 @@ namespace QDevice::Utilities
     template<typename value_type_t>
     inline void try_assign_device_property_value(const std::string& serialNumber, const std::string& propertyName, const qd_devices& devices, value_type_t& assignTo)
     {
-        if (const auto device = find_device(serialNumber, devices))
+        if(const auto device = find_device(serialNumber, devices))
         {
             try_assign_property_value(propertyName, device->properties, assignTo);
         }

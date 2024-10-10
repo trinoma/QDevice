@@ -7,11 +7,11 @@
  */
 
 #if defined(__WINDOWS__) || defined(_WIN32)
-#define QD_API __declspec(dllexport)
-#define QD_STDCALL __cdecl
+    #define QD_API __declspec(dllexport)
+    #define QD_STDCALL __cdecl
 #else
-#define QD_API
-#define QD_STDCALL
+    #define QD_API
+    #define QD_STDCALL
 #endif
 
 #define QD_API_MAJOR 0
@@ -22,11 +22,11 @@
 #define DEPRECATED(date) [[deprecated("QDevice - qdevice_api.h: Deprecated function since (" #date ") and MUST NOW BE REMOVED!")]]
 #define DEPRECATED_R(date, replacementFuncName) [[deprecated("QDevice - qdevice_api.h: Deprecated function since " #date " and MUST NOW BE REMOVED! REPLACEMENT: " #replacementFuncName)]]
 #else
-#if defined(_MSC_VER) || defined(_WIN32)
-#pragma warning(3:4996) // Makes "[deprecated]" generate warning instead of error
-#endif
-#define DEPRECATED(date) [[deprecated("QDevice - qdevice_api.h: Deprecated function since (" #date "), will be removed in next MAJOR version!")]]
-#define DEPRECATED_REPLACED(date, replacementFuncName) [[deprecated("QDevice - qdevice_api.h: Deprecated function since (" #date "), will be removed in next MAJOR version! REPLACEMENT: " #replacementFuncName)]]
+    #if defined(_MSC_VER) || defined(_WIN32)
+        #pragma warning(3:4996) // Makes "[deprecated]" generate warning instead of error
+    #endif
+    #define DEPRECATED(date) [[deprecated("QDevice - qdevice_api.h: Deprecated function since (" #date "), will be removed in next MAJOR version!")]]
+    #define DEPRECATED_REPLACED(date, replacementFuncName) [[deprecated("QDevice - qdevice_api.h: Deprecated function since (" #date "), will be removed in next MAJOR version! REPLACEMENT: " #replacementFuncName)]]
 #endif
 
 #include <stdbool.h>
@@ -533,7 +533,7 @@ extern "C"
     };
 
     /**
-     * \brief Specifies if a function call was successful or returned an error.
+     * \brief Specifies if a function call was successful or returned an error. 
      */
     typedef enum
     {
@@ -602,7 +602,7 @@ extern "C"
      *
      * See qd_action for more information.
      */
-    typedef struct qd_call_status(QD_STDCALL* qd_action_fn)(const struct qd_configuration*);
+    typedef struct qd_call_status(QD_STDCALL *qd_action_fn)(const struct qd_configuration*);
 
     /**
      * \brief Provides custom function over the QDevice API.
@@ -610,7 +610,7 @@ extern "C"
     struct qd_action
     {
         /**
-         * \brief Name of the action.
+         * \brief Name of the action. 
          *
          * Must be non-empty. Names must be title case.
          */
@@ -688,22 +688,22 @@ extern "C"
      *
      * \param[out] deviceName device which produced the samples
      * \param[out] channelName channel which the samples belong to
-     * \param[out] samples read sample data
+     * \param[out] samples read sample data 
      */
-    typedef void(QD_STDCALL* qd_sample_push_fn)(const char* deviceName, const char* channelName, struct qd_samples samples);
+    typedef void(QD_STDCALL *qd_sample_push_fn)(const char* deviceName, const char* channelName, struct qd_samples samples);
 
     /**
      * \name QDevice API functions \{
      */
 
-     /**
-      * \brief Get the QDevice API version the integration is implemented for.
-      *
-      * Implementation provided by qdevice_api.h.
-      *
-      * \param[out] version pointer to qd_semver where version is written
-      * \return Must always return qd_call_status_type::qd_call_status_type_ok.
-      */
+    /**
+     * \brief Get the QDevice API version the integration is implemented for.
+     *
+     * Implementation provided by qdevice_api.h.
+     *
+     * \param[out] version pointer to qd_semver where version is written
+     * \return Must always return qd_call_status_type::qd_call_status_type_ok.
+     */
     QD_API inline struct qd_call_status QD_STDCALL qd_get_api_version(struct qd_semver* version)
     {
         version->major = QD_API_MAJOR;
@@ -782,7 +782,7 @@ extern "C"
 
     /**
      * \brief Perform any load-time initialization that is needed by the integration.
-     *
+     * 
      * This function is optional. If it is implemented, it is called just after loading the integration DLL.
      */
     QD_API struct qd_call_status QD_STDCALL qd_initialize();
@@ -800,7 +800,7 @@ extern "C"
      * May be empty if integration provides no actions.
      *
      * See qd_action for further documentation.
-     *
+     * 
      * \param[out] actions pointer to where the qd_action objects will be written
      */
     QD_API struct qd_call_status QD_STDCALL qd_get_actions(struct qd_actions* actions);
@@ -814,7 +814,7 @@ extern "C"
      * exception of freeing it via qd_free_configuration.
      *
      * See qd_configuration for further documentation.
-     *
+     * 
      * \param[out] configuration pointer to where the qd_configuration object will be written
      */
     QD_API struct qd_call_status QD_STDCALL qd_get_configuration(struct qd_configuration* configuration);
@@ -822,7 +822,7 @@ extern "C"
 
     /**
      * \brief Free memory allocated by qd_get_configuration
-     *
+     * 
      * \param[in] configuration qd_configuration structure whose resources will be freed
      */
     QD_API struct qd_call_status QD_STDCALL qd_free_configuration(struct qd_configuration* configuration);
@@ -843,7 +843,7 @@ extern "C"
      * applied to the hardware. For integrations that require each device to be
      * described before a connection can be made, the devices should be described here.
      * For integrations in which the devices available is determined after a connection is
-     * made, this can be left as an empty list of qd_devices.
+     * made, this can be left as an empty list of qd_devices. 
      * The calling application is expected to provide values that matches the given
      * property definitions. However, integration is required to be resilient
      * against bugs and validate the give input with no assumptions about its
@@ -898,7 +898,7 @@ extern "C"
     QD_API struct qd_call_status QD_STDCALL qd_stop_streaming();
 
     /**
-     * \brief Get the current state of the hardware.
+     * \brief Get the current state of the hardware.     
      */
     QD_API struct qd_call_status QD_STDCALL qd_get_state(qd_state* state);
 
@@ -918,7 +918,7 @@ extern "C"
      * up to 10 seconds of buffering. If buffer limit is reached, integration
      * should stop streaming and subsequent calls to qd_read_samples() should
      * return an error.
-     *
+     * 
      * \param[in] callback the callback function that consumes the samples for the calling application
      */
     QD_API struct qd_call_status QD_STDCALL qd_read_samples(qd_sample_push_fn callback);

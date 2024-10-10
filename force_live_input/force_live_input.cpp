@@ -13,9 +13,22 @@
 #include <thread>
 #include <atomic>
 #include <vector>
+#include <mutex>
+#include <algorithm>
+
+// Undefine the min/max macros to prevent conflicts with std::min()
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
 
 namespace
 {
+    // Mutex to protect frames_data access between threads
+    std::mutex frames_data_mutex;
+
     const std::string UNKNOWN = "<unknown>";
     const std::string INTEGRATION_NAME = "Force Input";
     const std::string INTEGRATION_DESCRIPTION = "Test live force input device";
@@ -23,7 +36,7 @@ namespace
     const std::string DEVICE_MANUFACTURER = "TRINOMA";
     const std::string DEVICE_PRODUCT = "Test Live Force Input Product";
     const std::string DEVICE_MODEL = "Test Live Force Input Model";
-    constexpr auto DEVICE_FREQUENCY = 100;
+    constexpr auto DEVICE_FREQUENCY = 1000;
 
     struct force_plate_channel
     {
@@ -43,7 +56,7 @@ namespace
     std::vector<force_device> force_device_definitions
     {
         {
-            "0",
+            "Front",
             { 0.0f, 0.0f, 0.0f },
             { 0.0f, 180.0f, 0.0f },//rotate 180 degrees so the z-axis of the plate is down
             1.0f, 1.0f, 1.0f,
@@ -58,15 +71,64 @@ namespace
                 { "Application Y", qd_channel_unit_meters },
                 { "Application Z", qd_channel_unit_meters }
             }
-        }
+        },
+        {
+            "Rear",
+            { 0.0f, 0.0f, 0.0f },
+            { 0.0f, 0.0f, 0.0f },//rotate 180 degrees so the z-axis of the plate is down
+            1.0f, 1.0f, 1.0f,
+            {
+                { "Force X", qd_channel_unit_newtons },
+                { "Force Y", qd_channel_unit_newtons },
+                { "Force Z", qd_channel_unit_newtons },
+                { "Moment X", qd_channel_unit_newton_meters },
+                { "Moment Y", qd_channel_unit_newton_meters },
+                { "Moment Z", qd_channel_unit_newton_meters },
+                { "Application X", qd_channel_unit_meters },
+                { "Application Y", qd_channel_unit_meters },
+                { "Application Z", qd_channel_unit_meters }
+            }
+        },
+        {
+            "Left",
+            { 0.0f, 0.0f, 0.0f },
+            { 0.0f, 0.0f, 0.0f },//rotate 180 degrees so the z-axis of the plate is down
+            1.0f, 1.0f, 1.0f,
+            {
+                { "Force X", qd_channel_unit_newtons },
+                { "Force Y", qd_channel_unit_newtons },
+                { "Force Z", qd_channel_unit_newtons },
+                { "Moment X", qd_channel_unit_newton_meters },
+                { "Moment Y", qd_channel_unit_newton_meters },
+                { "Moment Z", qd_channel_unit_newton_meters },
+                { "Application X", qd_channel_unit_meters },
+                { "Application Y", qd_channel_unit_meters },
+                { "Application Z", qd_channel_unit_meters }
+            }
+        },
+        {
+			"Right",
+			{ 0.0f, 0.0f, 0.0f },
+			{ 0.0f, 0.0f, 0.0f },//rotate 180 degrees so the z-axis of the plate is down
+			1.0f, 1.0f, 1.0f,
+			{
+				{ "Force X", qd_channel_unit_newtons },
+				{ "Force Y", qd_channel_unit_newtons },
+				{ "Force Z", qd_channel_unit_newtons },
+				{ "Moment X", qd_channel_unit_newton_meters },
+				{ "Moment Y", qd_channel_unit_newton_meters },
+				{ "Moment Z", qd_channel_unit_newton_meters },
+				{ "Application X", qd_channel_unit_meters },
+				{ "Application Y", qd_channel_unit_meters },
+				{ "Application Z", qd_channel_unit_meters }
+			}
+		}
     };
 
     std::thread rt_thread;
-    std::atomic<bool> rt_running {false};
-  /*  std::array<float, 9> default_arr{ {0, 0, 0, 0, 0, 0, 0, 0, 0} };
-    std::vector< std::array<float, 9> > frames_data{ default_arr, default_arr, default_arr, default_arr, default_arr, default_arr, default_arr, default_arr, default_arr, default_arr,
-                                                    default_arr, default_arr, default_arr, default_arr, default_arr, default_arr, default_arr, default_arr, default_arr, default_arr };*/
+    std::atomic<bool> rt_running{ false };
 
+    /*std::vector< std::array<float, 36> > frames_data;*/
     std::vector< std::array<float, 9> > frames_data;
 
     using std_clock_t = std::chrono::high_resolution_clock;
@@ -77,6 +139,7 @@ namespace
     qd_state g_state = qd_state_disconnected;
 
     std::size_t g_pushed_samples = 0;
+    int frame_number = 0;
 
     qd_device create_device_from_definition(const force_device& fdevice)
     {
@@ -104,33 +167,11 @@ namespace
     }
 }
 
-//class SingletonRTProtocol
-//{
-//public:
-//    static CRTProtocol& getInstance()
-//    {
-//        if (!instance)
-//        {
-//            instance = new CRTProtocol();
-//        }
-//        return *instance;
-//    }
-//
-//private:
-//    SingletonRTProtocol() {};
-//    ~SingletonRTProtocol() {};
-//    static CRTProtocol* instance;
-//
-//};
-//
-//CRTProtocol* SingletonRTProtocol::instance = nullptr;
-
 
 void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data)
 {
     try {
 
-        //CRTProtocol& rtProtocol = SingletonRTProtocol::getInstance();
         CRTProtocol rtProtocol;
 
 
@@ -143,6 +184,14 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         bool dataAvailable = false;
         bool streamFrames = false;
         unsigned short udpPort = 6734;
+
+        //std::array<float, 36> fdata{ {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 
+        //    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        //    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        //    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f} };
+
+        std::array<float, 9> fdata{ {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f} };
+        
 
         while (running) {
 
@@ -180,17 +229,72 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
             {
                 if (packetType == CRTPacket::PacketData)
                 {
-                    CRTPacket::SForce sForce;
                     CRTPacket* rtPacket = rtProtocol.GetRTPacket();
-                    rtPacket->GetForceData(0, 0, sForce);
 
-                    std::array<float, 9> fdata{ {sForce.fForceX, sForce.fForceY, sForce.fForceZ,
-                        sForce.fMomentX, sForce.fMomentY, sForce.fMomentZ,
-                        sForce.fApplicationPointX, sForce.fApplicationPointY, sForce.fApplicationPointZ} };
+                    frame_number = rtPacket->GetFrameNumber();
 
-                    frames_data.push_back(fdata);
+                    unsigned int nCount = rtPacket->GetForcePlateCount();
+
+                    if (nCount > 0) //if force plate count is not null
+                    {
+                        CRTPacket::SForce sForce;
+                        unsigned int        nForceNumber;
+
+                        //for (unsigned int iPlate = 0; iPlate < 1; iPlate++) //loop on force plates
+                        //{
+                        //    if (iPlate < 4)
+                        //    {
+                                unsigned int nForceCount = rtPacket->GetForceCount(0);
+
+                                if (nForceCount > 0)
+                                {
+                                    for (unsigned int iForce = 0; iForce < nForceCount; iForce++) //loop over force frames
+                                    {
+                                        if (rtPacket->GetForceData(0, iForce, sForce)) //plate 0
+                                        {
+
+                                            unsigned int iPlate = 0;
+
+                                            fdata[iPlate * 9] = sForce.fForceX;
+                                            fdata[iPlate * 9 + 1] = sForce.fForceY;
+                                            fdata[iPlate * 9 + 2] = sForce.fForceZ;
+                                            fdata[iPlate * 9 + 3] = sForce.fMomentX;
+                                            fdata[iPlate * 9 + 4] = sForce.fMomentY;
+                                            fdata[iPlate * 9 + 5] = sForce.fMomentZ;
+                                            fdata[iPlate * 9 + 6] = sForce.fApplicationPointX;
+                                            fdata[iPlate * 9 + 7] = sForce.fApplicationPointY;
+                                            fdata[iPlate * 9 + 8] = sForce.fApplicationPointZ;
+
+                                            frames_data.push_back(fdata); //TO DO solve push_back issue
+                                        }
+
+                                        /*std::array<float, 9> fdata{ {(float)nForceCount, 0, 0,
+                                           0, 0, 0,
+                                           0, 0, 0} };
+
+                                        frames_data.push_back(fdata);*/
+                                    }
+
+                                }
+                                /*else {
+                                    std::array<float, 9> fdata{ {123.456f, 0, 0,
+                                                       0, 0, 0,
+                                                       0, 0, 0} };
+
+                                    frames_data.push_back(fdata);
+                                }*/
+                        //    }
+                        //}
+
+                        
+                    }
+
+                    
+
+                    
                 }
             }
+            
         }
     }
     catch (std::exception& e)
@@ -201,7 +305,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
 qd_call_status qd_get_integration_version(struct qd_static_chars* version)
 {
-    static const char str[] = "0.0.0";
+    static const char str[] = "0.1.1";
     *version = { str, sizeof(str) / sizeof(char) - 1 };
     return {};
 }
@@ -271,7 +375,6 @@ qd_call_status qd_connect(const qd_configuration* config)
     //no writable properties
 
     g_state = qd_state_connected;
-    //printf("\nCheck connect\n");
     return { qd_call_status_type_ok, nullptr };
 }
 
@@ -287,9 +390,7 @@ qd_call_status qd_disconnect()
         qd_stop_streaming();
     }
 
-    //printf("\n elements in frames_data before clear: %i\n", int(frames_data.size()));
     frames_data.clear();
-    //printf("\n elements in frames_data after clear: %i\n", int(frames_data.size()));
     g_state = qd_state_disconnected;
     return { qd_call_status_type_ok, nullptr };
 }
@@ -311,7 +412,6 @@ qd_call_status qd_start_streaming()
     g_pushed_samples = 0;
     rt_running = true;
     rt_thread = std::thread(update, std::ref(rt_running), std::ref(frames_data));
-    //printf("\nCheck start streaming\n");
     return { qd_call_status_type_ok, nullptr };
 }
 
@@ -324,8 +424,6 @@ qd_call_status qd_stop_streaming()
 
     rt_running = false;
     rt_thread.join();
-    //printf("\n elements in frames_data after join: %i", int(frames_data.size()));
-    //printf("\nCheck stop streaming\n");
     g_state = qd_state_connected;
     return { qd_call_status_type_ok, nullptr };
 }
@@ -342,30 +440,31 @@ namespace
     template<typename T>
     void push_samples(qd_sample_push_fn callback,
         const force_device& fdevice,
+        //const std::size_t fdevice_index,
         const std::size_t sample,
         const std::size_t count)
     {
         for (std::size_t c = 0; c < fdevice.channels.size(); c++)
         {
-            //printf(" c var = %i, count var = %i\n", int(c), int(count));
             std::vector<T> samples{};
             samples.reserve(count);
 
+            // Process only available frames
             for (std::size_t sample_index = 0; sample_index < count; sample_index++)
             {
                 try {
-                    const auto sample_value = frames_data.at(sample_index)[c];
-                    samples.push_back(sample_value);
-                    //printf("\n sample_value: %f\n", float(sample_value));
+                    const auto& frame = frames_data.at(sample_index);  // Access frame data safely
+                    //samples.push_back(frame[fdevice_index * 9 + c]);  // Get channel data
+                    samples.push_back(frame[c]);
                 }
-                catch (std::exception& e) {
-
+                catch (const std::out_of_range& e) {
+                    // Handle case where not enough frames are available
                     printf("\n No data, error: %s\n", e.what());
-                    samples.push_back(0.0);
+                    samples.push_back(0.0);  // Add placeholder data
                 }
-
             }
 
+            // Push the collected samples for this channel to the callback
             callback(fdevice.serial_number.c_str(), fdevice.channels[c].name.c_str(), qd_samples{
                 sample,
                 qd_sample_encoding_float32,
@@ -377,15 +476,34 @@ namespace
 
 qd_call_status qd_read_samples(qd_sample_push_fn callback)
 {
+    // Calculate how many samples should be processed
     const auto samples_since_start = std::chrono::duration_cast<sample_duration_t>(std_clock_t::now() - g_streaming_start);
     const auto sample_start = g_pushed_samples;
     const auto sample_count = static_cast<std::size_t>(samples_since_start.count() - sample_start);
 
-    for (const auto& fdevice : force_device_definitions)
+    // Make sure there are enough new frames to process
+    if (sample_count > 0 && !frames_data.empty())
     {
-        push_samples<std::float_t>(callback, fdevice, sample_start, sample_count);
+        // Cast both values to std::size_t for compatibility
+        const auto frames_to_process = std::min(static_cast<std::size_t>(sample_count), static_cast<std::size_t>(frames_data.size()));
+
+        // Push samples for all devices
+        for (size_t fdeviceIndex = 0; fdeviceIndex < force_device_definitions.size(); ++fdeviceIndex) {
+            const auto& fdevice = force_device_definitions[fdeviceIndex];
+            //push_samples<std::float_t>(callback, fdevice, fdeviceIndex, sample_start, frames_to_process);
+            push_samples<std::float_t>(callback, fdevice, sample_start, frames_to_process);
+        }
+
+        // Update the number of pushed samples
+        g_pushed_samples += frames_to_process;
+
+        // Remove processed frames from frames_data
+        frames_data_mutex.lock();  // Manually lock before modifying shared data
+        frames_data.erase(frames_data.begin(), frames_data.begin() + frames_to_process);
+        frames_data_mutex.unlock();  // Unlock after modifying shared data
     }
-    g_pushed_samples += sample_count;
 
     return { qd_call_status_type_ok, nullptr };
 }
+
+

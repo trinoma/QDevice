@@ -6,6 +6,7 @@
 *.lo
 *.o
 *.obj
+*.ilk
 
 # Precompiled Headers
 *.gch
@@ -15,6 +16,7 @@
 *.so
 *.dylib
 *.dll
+*.recipe
 
 # Fortran module files
 *.mod
@@ -30,3 +32,17 @@
 *.exe
 *.out
 *.app
+
+# Log files
+*.log
+*.tlog
+
+# Solution files
+*.sln
+*.vcxproj*
+*.vcxproj
+
+# Debug files
+*.pdb
+*.idb
+*.exp
