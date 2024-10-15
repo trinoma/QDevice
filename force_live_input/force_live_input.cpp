@@ -16,6 +16,7 @@
 #include <mutex>
 #include <algorithm>
 
+
 // Undefine the min/max macros to prevent conflicts with std::min()
 #ifdef min
 #undef min
@@ -58,7 +59,7 @@ namespace
         {
             "Front",
             { 0.0f, 0.0f, 0.0f },
-            { 0.0f, 180.0f, 0.0f },//rotate 180 degrees so the z-axis of the plate is down
+            { 0.0f, 0.0f, 0.0f },
             1.0f, 1.0f, 1.0f,
             {
                 { "Force X", qd_channel_unit_newtons },
@@ -75,24 +76,7 @@ namespace
         {
             "Rear",
             { 0.0f, 0.0f, 0.0f },
-            { 0.0f, 0.0f, 0.0f },//rotate 180 degrees so the z-axis of the plate is down
-            1.0f, 1.0f, 1.0f,
-            {
-                { "Force X", qd_channel_unit_newtons },
-                { "Force Y", qd_channel_unit_newtons },
-                { "Force Z", qd_channel_unit_newtons },
-                { "Moment X", qd_channel_unit_newton_meters },
-                { "Moment Y", qd_channel_unit_newton_meters },
-                { "Moment Z", qd_channel_unit_newton_meters },
-                { "Application X", qd_channel_unit_meters },
-                { "Application Y", qd_channel_unit_meters },
-                { "Application Z", qd_channel_unit_meters }
-            }
-        },
-        {
-            "Left",
             { 0.0f, 0.0f, 0.0f },
-            { 0.0f, 0.0f, 0.0f },//rotate 180 degrees so the z-axis of the plate is down
             1.0f, 1.0f, 1.0f,
             {
                 { "Force X", qd_channel_unit_newtons },
@@ -107,9 +91,26 @@ namespace
             }
         },
         {
-			"Right",
+            "Right",
+            { 0.0f, 0.0f, 0.0f },
+            { 0.0f, 0.0f, 0.0f },
+            1.0f, 1.0f, 1.0f,
+            {
+                { "Force X", qd_channel_unit_newtons },
+                { "Force Y", qd_channel_unit_newtons },
+                { "Force Z", qd_channel_unit_newtons },
+                { "Moment X", qd_channel_unit_newton_meters },
+                { "Moment Y", qd_channel_unit_newton_meters },
+                { "Moment Z", qd_channel_unit_newton_meters },
+                { "Application X", qd_channel_unit_meters },
+                { "Application Y", qd_channel_unit_meters },
+                { "Application Z", qd_channel_unit_meters }
+            }
+        },
+        {
+			"Left",
 			{ 0.0f, 0.0f, 0.0f },
-			{ 0.0f, 0.0f, 0.0f },//rotate 180 degrees so the z-axis of the plate is down
+			{ 0.0f, 0.0f, 0.0f },
 			1.0f, 1.0f, 1.0f,
 			{
 				{ "Force X", qd_channel_unit_newtons },
@@ -129,7 +130,10 @@ namespace
     std::atomic<bool> rt_running{ false };
 
     /*std::vector< std::array<float, 36> > frames_data;*/
-    std::vector< std::array<float, 9> > frames_data;
+    std::vector< std::array<float, 9> > frames_data_front;
+    std::vector< std::array<float, 9> > frames_data_rear;
+    std::vector< std::array<float, 9> > frames_data_right;
+    std::vector< std::array<float, 9> > frames_data_left;
 
     using std_clock_t = std::chrono::high_resolution_clock;
     std_clock_t::time_point g_streaming_start{};
@@ -138,7 +142,11 @@ namespace
 
     qd_state g_state = qd_state_disconnected;
 
-    std::size_t g_pushed_samples = 0;
+    std::size_t g_pushed_samples_front = 0;
+    std::size_t g_pushed_samples_rear = 0;
+    std::size_t g_pushed_samples_right = 0;
+    std::size_t g_pushed_samples_left = 0;
+
     int frame_number = 0;
 
     qd_device create_device_from_definition(const force_device& fdevice)
@@ -168,7 +176,7 @@ namespace
 }
 
 
-void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data)
+void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data_front, std::vector< std::array<float, 9> >& frames_data_rear)
 {
     try {
 
@@ -184,13 +192,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         bool dataAvailable = false;
         bool streamFrames = false;
         unsigned short udpPort = 6734;
-
-        //std::array<float, 36> fdata{ {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 
-        //    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        //    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        //    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f} };
-
-        std::array<float, 9> fdata{ {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f} };
         
 
         while (running) {
@@ -240,61 +241,42 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                         CRTPacket::SForce sForce;
                         unsigned int        nForceNumber;
 
-                        //for (unsigned int iPlate = 0; iPlate < 1; iPlate++) //loop on force plates
-                        //{
-                        //    if (iPlate < 4)
-                        //    {
-                                unsigned int nForceCount = rtPacket->GetForceCount(0);
+                        for (unsigned int iPlate = 0; iPlate < nCount; iPlate++) //loop on force plates
+                        {
+                            if (iPlate < 4)
+                            {
+                                unsigned int nForceCount = rtPacket->GetForceCount(iPlate);
 
                                 if (nForceCount > 0)
                                 {
                                     for (unsigned int iForce = 0; iForce < nForceCount; iForce++) //loop over force frames
                                     {
-                                        if (rtPacket->GetForceData(0, iForce, sForce)) //plate 0
+                                        if (rtPacket->GetForceData(iPlate, iForce, sForce)) //plate 0
                                         {
+                                            std::array<float, 9> fdata{ {sForce.fForceX, sForce.fForceY, sForce.fForceZ,
+                                                sForce.fMomentX, sForce.fMomentY, sForce.fMomentZ,
+                                                sForce.fApplicationPointX, sForce.fApplicationPointY, sForce.fApplicationPointZ} };
 
-                                            unsigned int iPlate = 0;
-
-                                            fdata[iPlate * 9] = sForce.fForceX;
-                                            fdata[iPlate * 9 + 1] = sForce.fForceY;
-                                            fdata[iPlate * 9 + 2] = sForce.fForceZ;
-                                            fdata[iPlate * 9 + 3] = sForce.fMomentX;
-                                            fdata[iPlate * 9 + 4] = sForce.fMomentY;
-                                            fdata[iPlate * 9 + 5] = sForce.fMomentZ;
-                                            fdata[iPlate * 9 + 6] = sForce.fApplicationPointX;
-                                            fdata[iPlate * 9 + 7] = sForce.fApplicationPointY;
-                                            fdata[iPlate * 9 + 8] = sForce.fApplicationPointZ;
-
-                                            frames_data.push_back(fdata); //TO DO solve push_back issue
+                                            if (iPlate == 0) {
+                                                frames_data_front.push_back(fdata);
+                                            }
+                                            else if (iPlate == 1) {
+                                                frames_data_rear.push_back(fdata);
+                                            }
+                                            else if (iPlate == 2) {
+												frames_data_right.push_back(fdata);
+											}
+											else if (iPlate == 3) {
+												frames_data_left.push_back(fdata);
+											}
                                         }
-
-                                        /*std::array<float, 9> fdata{ {(float)nForceCount, 0, 0,
-                                           0, 0, 0,
-                                           0, 0, 0} };
-
-                                        frames_data.push_back(fdata);*/
                                     }
-
                                 }
-                                /*else {
-                                    std::array<float, 9> fdata{ {123.456f, 0, 0,
-                                                       0, 0, 0,
-                                                       0, 0, 0} };
-
-                                    frames_data.push_back(fdata);
-                                }*/
-                        //    }
-                        //}
-
-                        
-                    }
-
-                    
-
-                    
+                            }
+                        } 
+                    }   
                 }
-            }
-            
+            }    
         }
     }
     catch (std::exception& e)
@@ -390,7 +372,11 @@ qd_call_status qd_disconnect()
         qd_stop_streaming();
     }
 
-    frames_data.clear();
+    frames_data_front.clear();
+    frames_data_rear.clear();
+    frames_data_right.clear();
+    frames_data_left.clear();
+
     g_state = qd_state_disconnected;
     return { qd_call_status_type_ok, nullptr };
 }
@@ -409,9 +395,13 @@ qd_call_status qd_start_streaming()
 
     g_state = qd_state_streaming;
     g_streaming_start = std_clock_t::now();
-    g_pushed_samples = 0;
+    g_pushed_samples_front = 0;
+    g_pushed_samples_rear = 0;
+    g_pushed_samples_right = 0;
+    g_pushed_samples_left = 0;
+
     rt_running = true;
-    rt_thread = std::thread(update, std::ref(rt_running), std::ref(frames_data));
+    rt_thread = std::thread(update, std::ref(rt_running), std::ref(frames_data_front), std::ref(frames_data_rear));
     return { qd_call_status_type_ok, nullptr };
 }
 
@@ -442,7 +432,8 @@ namespace
         const force_device& fdevice,
         //const std::size_t fdevice_index,
         const std::size_t sample,
-        const std::size_t count)
+        const std::size_t count,
+        const std::vector<std::array<float, 9>>& frames_data_to_push)
     {
         for (std::size_t c = 0; c < fdevice.channels.size(); c++)
         {
@@ -453,7 +444,7 @@ namespace
             for (std::size_t sample_index = 0; sample_index < count; sample_index++)
             {
                 try {
-                    const auto& frame = frames_data.at(sample_index);  // Access frame data safely
+                    const auto& frame = frames_data_to_push.at(sample_index);  // Access frame data safely
                     //samples.push_back(frame[fdevice_index * 9 + c]);  // Get channel data
                     samples.push_back(frame[c]);
                 }
@@ -476,32 +467,60 @@ namespace
 
 qd_call_status qd_read_samples(qd_sample_push_fn callback)
 {
-    // Calculate how many samples should be processed
-    const auto samples_since_start = std::chrono::duration_cast<sample_duration_t>(std_clock_t::now() - g_streaming_start);
-    const auto sample_start = g_pushed_samples;
-    const auto sample_count = static_cast<std::size_t>(samples_since_start.count() - sample_start);
+    // Process frames_data_front
+    if (!frames_data_front.empty()) {
+        const auto frames_to_process_front = static_cast<std::size_t>(frames_data_front.size());
 
-    // Make sure there are enough new frames to process
-    if (sample_count > 0 && !frames_data.empty())
-    {
-        // Cast both values to std::size_t for compatibility
-        const auto frames_to_process = std::min(static_cast<std::size_t>(sample_count), static_cast<std::size_t>(frames_data.size()));
+        const auto& fdevice = force_device_definitions[0];
+        push_samples<std::float_t>(callback, fdevice, g_pushed_samples_front, frames_to_process_front, frames_data_front);
 
-        // Push samples for all devices
-        for (size_t fdeviceIndex = 0; fdeviceIndex < force_device_definitions.size(); ++fdeviceIndex) {
-            const auto& fdevice = force_device_definitions[fdeviceIndex];
-            //push_samples<std::float_t>(callback, fdevice, fdeviceIndex, sample_start, frames_to_process);
-            push_samples<std::float_t>(callback, fdevice, sample_start, frames_to_process);
-        }
+        g_pushed_samples_front += frames_to_process_front;
 
-        // Update the number of pushed samples
-        g_pushed_samples += frames_to_process;
-
-        // Remove processed frames from frames_data
-        frames_data_mutex.lock();  // Manually lock before modifying shared data
-        frames_data.erase(frames_data.begin(), frames_data.begin() + frames_to_process);
+        frames_data_mutex.lock();  // Lock before modifying shared data
+        frames_data_front.erase(frames_data_front.begin(), frames_data_front.begin() + frames_to_process_front);
         frames_data_mutex.unlock();  // Unlock after modifying shared data
     }
+    // Process frames_data_rear
+    if (!frames_data_rear.empty()) {
+        const auto frames_to_process_rear = static_cast<std::size_t>(frames_data_rear.size());
+
+        const auto& fdevice = force_device_definitions[1];
+        push_samples<std::float_t>(callback, fdevice, g_pushed_samples_rear, frames_to_process_rear, frames_data_rear);
+
+        g_pushed_samples_rear += frames_to_process_rear;
+
+        frames_data_mutex.lock();  // Lock before modifying shared data
+        frames_data_rear.erase(frames_data_rear.begin(), frames_data_rear.begin() + frames_to_process_rear);
+        frames_data_mutex.unlock();  // Unlock after modifying shared data
+    }
+    // Process frames_data_right
+    if (!frames_data_right.empty()) {
+		const auto frames_to_process_right = static_cast<std::size_t>(frames_data_right.size());
+
+		const auto& fdevice = force_device_definitions[2];
+		push_samples<std::float_t>(callback, fdevice, g_pushed_samples_right, frames_to_process_right, frames_data_right);
+
+		g_pushed_samples_right += frames_to_process_right;
+
+		frames_data_mutex.lock();  // Lock before modifying shared data
+		frames_data_right.erase(frames_data_right.begin(), frames_data_right.begin() + frames_to_process_right);
+		frames_data_mutex.unlock();  // Unlock after modifying shared data
+	}
+    // Process frames_data_left
+    if (!frames_data_left.empty()) {
+        const auto frames_to_process_left = static_cast<std::size_t>(frames_data_left.size());
+
+        const auto& fdevice = force_device_definitions[3];
+        push_samples<std::float_t>(callback, fdevice, g_pushed_samples_left, frames_to_process_left, frames_data_left);
+
+        g_pushed_samples_left += frames_to_process_left;
+
+        frames_data_mutex.lock();  // Lock before modifying shared data
+        frames_data_left.erase(frames_data_left.begin(), frames_data_left.begin() + frames_to_process_left);
+        frames_data_mutex.unlock();  // Unlock after modifying shared data
+    }
+
+
 
     return { qd_call_status_type_ok, nullptr };
 }

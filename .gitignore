@@ -46,3 +46,6 @@
 *.pdb
 *.idb
 *.exp
+
+# Hidden files
+*\.vs*
