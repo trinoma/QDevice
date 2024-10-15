@@ -68,9 +68,9 @@ namespace
                 { "Moment X", qd_channel_unit_newton_meters },
                 { "Moment Y", qd_channel_unit_newton_meters },
                 { "Moment Z", qd_channel_unit_newton_meters },
-                { "Application X", qd_channel_unit_meters },
-                { "Application Y", qd_channel_unit_meters },
-                { "Application Z", qd_channel_unit_meters }
+                { "Application X", qd_channel_unit_millimeters },
+                { "Application Y", qd_channel_unit_millimeters },
+                { "Application Z", qd_channel_unit_millimeters }
             }
         },
         {
@@ -85,9 +85,9 @@ namespace
                 { "Moment X", qd_channel_unit_newton_meters },
                 { "Moment Y", qd_channel_unit_newton_meters },
                 { "Moment Z", qd_channel_unit_newton_meters },
-                { "Application X", qd_channel_unit_meters },
-                { "Application Y", qd_channel_unit_meters },
-                { "Application Z", qd_channel_unit_meters }
+                { "Application X", qd_channel_unit_millimeters },
+                { "Application Y", qd_channel_unit_millimeters },
+                { "Application Z", qd_channel_unit_millimeters }
             }
         },
         {
@@ -102,9 +102,9 @@ namespace
                 { "Moment X", qd_channel_unit_newton_meters },
                 { "Moment Y", qd_channel_unit_newton_meters },
                 { "Moment Z", qd_channel_unit_newton_meters },
-                { "Application X", qd_channel_unit_meters },
-                { "Application Y", qd_channel_unit_meters },
-                { "Application Z", qd_channel_unit_meters }
+                { "Application X", qd_channel_unit_millimeters },
+                { "Application Y", qd_channel_unit_millimeters },
+                { "Application Z", qd_channel_unit_millimeters }
             }
         },
         {
@@ -119,9 +119,9 @@ namespace
 				{ "Moment X", qd_channel_unit_newton_meters },
 				{ "Moment Y", qd_channel_unit_newton_meters },
 				{ "Moment Z", qd_channel_unit_newton_meters },
-				{ "Application X", qd_channel_unit_meters },
-				{ "Application Y", qd_channel_unit_meters },
-				{ "Application Z", qd_channel_unit_meters }
+				{ "Application X", qd_channel_unit_millimeters },
+				{ "Application Y", qd_channel_unit_millimeters },
+				{ "Application Z", qd_channel_unit_millimeters }
 			}
 		}
     };
@@ -191,6 +191,79 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         bool dataAvailable = false;
         bool streamFrames = false;
         unsigned short udpPort = 6734;
+
+        const char components[256] = "Force 6deuler ";
+        const char* Treadmill6DOF = "Treadmill";
+
+        //force plate parameters (TODO READ FROM CODE)
+        const float front_a = 0.0002794f; //x in mm
+        const float front_b = 0.0006096f;
+        const float front_c = -0.0432054f;
+        const float rear_a = 0.0005842f;
+        const float rear_b = -0.0014478f;
+        const float rear_c = -0.0415036f;
+
+
+        const float FP_params[2][3] = {
+            {front_a, front_b, front_c},
+            {rear_a, rear_b, rear_c}
+        };
+
+
+        float prevForceMean[4][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f}
+        };
+
+        float prevMomentMean[4][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f}
+        };
+
+
+        bool plateON[4] = { false, false, false, false };
+
+        float treadmillAngle = 0.0f;
+        float lastTreadmillAngle = 0.0f;
+
+        bool assignFrontToRight = true;
+        bool assignRearToRight = true;
+
+        //force and moment angle offset correction factor
+        float inclineForceFactor[2][3] = {
+            {0.0f, -8.0f, 0.0f},
+            {0.0f, -8.0f, 0.0f},
+        };
+
+        float inclineMomentFactor[2][3] = {
+            {0.0f, -8.0f, 0.0f},
+            {0.0f, -8.0f, 0.0f},
+        };
+
+        //force and moment baseline for front and rear plates
+        float forceBaseline[2][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+        };
+
+        float momentBaseline[2][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+        };
+
+        float unloadedForceBaseline[2][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+        };
+
+        float unloadedMomentBaseline[2][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+        };
         
 
         while (running) {
@@ -215,7 +288,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
             if (!streamFrames)
             {
-                if (!rtProtocol.StreamFrames(CRTProtocol::RateAllFrames, 0, udpPort, NULL, CRTProtocol::cComponentForce))
+                if (!rtProtocol.StreamFrames(CRTProtocol::RateAllFrames, 0, udpPort, NULL, components))
                 {
                     printf("rtProtocol.StreamFrames: %s\n\n", rtProtocol.GetErrorString());
                     //rtProtocol.GetErrorString();
@@ -233,12 +306,38 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                     frame_number = rtPacket->GetFrameNumber();
 
+                    //Get 6DOF Euler data
+                    float fX, fY, fZ, fAng1, fAng2, fAng3;
+                    
+                    unsigned int RBCount = rtPacket->Get6DOFEulerBodyCount();
+
+                    if (RBCount > 0)
+                    {
+                        for (unsigned int iRB = 0; iRB < RBCount; iRB++)
+                        {
+                            if (rtPacket->Get6DOFEulerBody(iRB, fX, fY, fZ, fAng1, fAng2, fAng3))
+                            {
+                                const char* pTmpStr = rtProtocol.Get6DOFBodyName(iRB);
+
+                                if (pTmpStr != nullptr && strcmp(pTmpStr, Treadmill6DOF) == 0)
+                                {
+                                    treadmillAngle = -fAng2;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    
+
                     unsigned int nCount = rtPacket->GetForcePlateCount();
 
                     if (nCount > 0) //if force plate count is not null
                     {
                         CRTPacket::SForce sForce;
-                        unsigned int        nForceNumber;
+
+                        float forceMean[3] = { 0.0f, 0.0f , 0.0f };
+                        float momentMean[3] = { 0.0f, 0.0f , 0.0f };
 
                         for (unsigned int iPlate = 0; iPlate < nCount; iPlate++) //loop on force plates
                         {
@@ -248,29 +347,210 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                 if (nForceCount > 0)
                                 {
+                                    std::array<std::unique_ptr<float[]>, 3> forces = {
+                                        std::make_unique<float[]>(nForceCount),  // xForce
+                                        std::make_unique<float[]>(nForceCount),  // yForce
+                                        std::make_unique<float[]>(nForceCount)   // zForce
+                                    };
+
+                                    std::array<std::unique_ptr<float[]>, 3> moments = {
+                                        std::make_unique<float[]>(nForceCount),  // xMoment
+                                        std::make_unique<float[]>(nForceCount),  // yMoment
+                                        std::make_unique<float[]>(nForceCount)   // zMoment
+                                    };
+
+                                    std::array<std::unique_ptr<float[]>, 3> cop = {
+                                        std::make_unique<float[]>(nForceCount),  // xCOP
+                                        std::make_unique<float[]>(nForceCount),  // yCOP
+                                        std::make_unique<float[]>(nForceCount)   // zCOP
+                                    };
+
+                                    float forceSum[3] = { 0.0f, 0.0f , 0.0f };
+                                    float momentSum[3] = { 0.0f, 0.0f , 0.0f };
+
                                     for (unsigned int iForce = 0; iForce < nForceCount; iForce++) //loop over force frames
                                     {
                                         if (rtPacket->GetForceData(iPlate, iForce, sForce)) //plate 0
                                         {
-                                            std::array<float, 9> fdata{ {sForce.fForceX, sForce.fForceY, sForce.fForceZ,
-                                                sForce.fMomentX, sForce.fMomentY, sForce.fMomentZ,
-                                                sForce.fApplicationPointX, sForce.fApplicationPointY, sForce.fApplicationPointZ} };
+                                            forces[0][iForce] = sForce.fForceX;
+                                            forces[1][iForce] = sForce.fForceY;
+                                            forces[2][iForce] = sForce.fForceZ;
 
-                                            if (iPlate == 0) {
-                                                frames_data_front.push_back(fdata);
-                                            }
-                                            else if (iPlate == 1) {
-                                                frames_data_rear.push_back(fdata);
-                                            }
-                                            else if (iPlate == 2) {
-												frames_data_right.push_back(fdata);
-											}
-											else if (iPlate == 3) {
-												frames_data_left.push_back(fdata);
-											}
+                                            moments[0][iForce] = sForce.fMomentX;
+                                            moments[1][iForce] = sForce.fMomentY;
+                                            moments[2][iForce] = sForce.fMomentZ;
+
+                                            cop[0][iForce] = sForce.fApplicationPointX;
+                                            cop[1][iForce] = sForce.fApplicationPointY;
+                                            cop[2][iForce] = sForce.fApplicationPointZ;
+
+                                            forceSum[0] += forces[0][iForce];
+                                            forceSum[1] += forces[1][iForce];
+                                            forceSum[2] += forces[2][iForce];
+
+                                            momentSum[0] += moments[0][iForce];
+                                            momentSum[1] += moments[1][iForce];
+                                            momentSum[2] += moments[2][iForce];
                                         }
                                     }
+
+                                    //compute mean force and moment over camera frame (as force frame rate is higher than camera rate, there are several force frames per camera frame)
+                                    forceMean[0] = forceSum[0] / nForceCount; //X
+                                    forceMean[1] = forceSum[1] / nForceCount; //Y
+                                    forceMean[2] = forceSum[2] / nForceCount; //Z
+
+                                    momentMean[0] = momentSum[0] / nForceCount; //X
+                                    momentMean[1] = momentSum[1] / nForceCount; //Y
+                                    momentMean[2] = momentSum[2] / nForceCount; //Z
+
+                                    if (forceMean[2] < 20) { //if mean Z force on is below 20N
+                                        if (prevForceMean[iPlate][2] > 20) { //if previous frame mean Z force was above 20N (offset threshold)
+                                            plateON[iPlate] = false;
+
+                                            // reinitialize factors and baseline at foot off
+                                            if (iPlate == 0 || iPlate == 1) // front/rear plates
+                                            {
+                                                inclineForceFactor[iPlate][0] = 0.0f;
+                                                inclineForceFactor[iPlate][1] = -8.0f;
+                                                inclineForceFactor[iPlate][2] = 0.0f;
+
+                                                inclineMomentFactor[iPlate][0] = 0.0f;
+                                                inclineMomentFactor[iPlate][1] = 0.0f;
+                                                inclineMomentFactor[iPlate][2] = 0.0f;
+
+                                                unloadedForceBaseline[iPlate][0] = forceBaseline[iPlate][0];
+                                                unloadedForceBaseline[iPlate][1] = forceBaseline[iPlate][1];
+                                                unloadedForceBaseline[iPlate][2] = forceBaseline[iPlate][2];
+
+                                                unloadedMomentBaseline[iPlate][0] = momentBaseline[iPlate][0];
+                                                unloadedMomentBaseline[iPlate][1] = momentBaseline[iPlate][1];
+                                                unloadedMomentBaseline[iPlate][2] = momentBaseline[iPlate][2];
+                                            }
+
+                                            if (iPlate == 2) {
+                                                assignRearToRight = false;
+                                            }
+                                            else if (iPlate == 3) {
+                                                assignRearToRight = true;
+                                            }
+                                        }
+                                    }
+                                    else if (forceMean[2] > 20) { //if mean Z force on is above 20N
+                                        if (prevForceMean[iPlate][2] < 20) { //if previous frame mean Z force was below 20N (onset threshold)
+                                            plateON[iPlate] = true;
+                                            if (iPlate == 2) {
+                                                assignFrontToRight = true;
+                                            }
+                                            else if (iPlate == 3) {
+                                                assignFrontToRight = false;
+                                            }
+                                        }
+                                    }
+
+                                    if (iPlate == 0 || iPlate == 1) // front/rear plates
+                                    {
+                                        // when plate is off and treadmill inclined (0.5 to avoid division by O), adjustment factors are computed
+                                        // adjustement factors serve to adjust force offset when foot is on while moving
+
+                                        if (plateON[iPlate] == false)
+                                        {
+                                            unloadedForceBaseline[iPlate][0] = (prevForceMean[iPlate][0] + unloadedForceBaseline[iPlate][0]) / 2;
+                                            unloadedForceBaseline[iPlate][1] = (prevForceMean[iPlate][1] + unloadedForceBaseline[iPlate][1]) / 2;
+                                            unloadedForceBaseline[iPlate][2] = (prevForceMean[iPlate][2] + unloadedForceBaseline[iPlate][2]) / 2;
+
+                                            forceBaseline[iPlate][0] = unloadedForceBaseline[iPlate][0];
+                                            forceBaseline[iPlate][1] = unloadedForceBaseline[iPlate][1];
+                                            forceBaseline[iPlate][2] = unloadedForceBaseline[iPlate][2];
+
+                                            unloadedMomentBaseline[iPlate][0] = (prevMomentMean[iPlate][0] + unloadedMomentBaseline[iPlate][0]) / 2;
+                                            unloadedMomentBaseline[iPlate][1] = (prevMomentMean[iPlate][1] + unloadedMomentBaseline[iPlate][1]) / 2;
+                                            unloadedMomentBaseline[iPlate][2] = (prevMomentMean[iPlate][2] + unloadedMomentBaseline[iPlate][2]) / 2;
+
+                                            momentBaseline[iPlate][0] = unloadedMomentBaseline[iPlate][0];
+                                            momentBaseline[iPlate][1] = unloadedMomentBaseline[iPlate][1];
+                                            momentBaseline[iPlate][2] = unloadedMomentBaseline[iPlate][2];
+
+                                            if (abs(treadmillAngle) > 0.5f)
+                                            {
+                                                inclineForceFactor[iPlate][0] = ((prevForceMean[iPlate][0] / treadmillAngle) + inclineForceFactor[iPlate][0]) / 2;
+                                                inclineForceFactor[iPlate][1] = ((prevForceMean[iPlate][1] / treadmillAngle) + inclineForceFactor[iPlate][1]) / 2;
+                                                inclineForceFactor[iPlate][2] = ((prevForceMean[iPlate][2] / treadmillAngle)) + inclineForceFactor[iPlate][2] / 2;
+                                                inclineMomentFactor[iPlate][0] = ((prevMomentMean[iPlate][0] / treadmillAngle) + inclineMomentFactor[iPlate][0]) / 2;
+                                                inclineMomentFactor[iPlate][1] = ((prevMomentMean[iPlate][1] / treadmillAngle) + inclineMomentFactor[iPlate][1]) / 2;
+                                                inclineMomentFactor[iPlate][2] = ((prevMomentMean[iPlate][2] / treadmillAngle)) + inclineMomentFactor[iPlate][2] / 2;
+                                            }
+                                            lastTreadmillAngle = treadmillAngle;
+                                        }
+                                        else {
+                                            forceBaseline[iPlate][0] = unloadedForceBaseline[iPlate][0] + inclineForceFactor[iPlate][0] * (treadmillAngle - lastTreadmillAngle);
+                                            forceBaseline[iPlate][1] = unloadedForceBaseline[iPlate][1] + inclineForceFactor[iPlate][1] * (treadmillAngle - lastTreadmillAngle);
+                                            forceBaseline[iPlate][2] = unloadedForceBaseline[iPlate][2] + inclineForceFactor[iPlate][2] * (treadmillAngle - lastTreadmillAngle);
+
+                                            momentBaseline[iPlate][0] = unloadedMomentBaseline[iPlate][0] + inclineMomentFactor[iPlate][0] * (treadmillAngle - lastTreadmillAngle);
+                                            momentBaseline[iPlate][1] = unloadedMomentBaseline[iPlate][1] + inclineMomentFactor[iPlate][1] * (treadmillAngle - lastTreadmillAngle);
+                                            momentBaseline[iPlate][2] = unloadedMomentBaseline[iPlate][2] + inclineMomentFactor[iPlate][2] * (treadmillAngle - lastTreadmillAngle);
+                                        }
+
+                                        for (unsigned int iForce = 0; iForce < nForceCount; iForce++) { //loop over force frames
+                                            if (forces[0] && forces[1] && forces[2])
+                                            {
+                                                forces[0][iForce] -= forceBaseline[iPlate][0];
+                                                forces[1][iForce] -= forceBaseline[iPlate][1];
+                                                forces[2][iForce] -= forceBaseline[iPlate][2];
+
+                                                moments[0][iForce] -= momentBaseline[iPlate][0];
+                                                moments[1][iForce] -= momentBaseline[iPlate][1];
+                                                moments[2][iForce] -= momentBaseline[iPlate][2];
+
+
+                                                if (plateON[iPlate] == true)
+                                                {
+                                                    cop[0][iForce] = (((FP_params[iPlate][2] * forces[0][iForce] - moments[1][iForce]) / forces[2][iForce]) + FP_params[iPlate][0]) * 1000; //((ORIGIN[Z] * Force[X] - M[Y]) / Force[Z]) + ORIGIN[X]
+                                                    cop[1][iForce] = (((FP_params[iPlate][2] * forces[1][iForce] + moments[0][iForce]) / forces[2][iForce]) + FP_params[iPlate][1]) * 1000; //((ORIGIN[Z] * Force[Y] + M[X]) / Force[Z]) + ORIGIN[Y]
+                                                    cop[1][iForce] = 0.0f; //cop Z stays O
+                                                }
+                                            }
+                                        }
+                                        printf("\n");
+
+                                    /*
+                                    TODO
+                                    - assign new forces to left/right plates
+                                    - compute COP
+
+                                    */
+
+                                    }
+
+                                    for (unsigned int iForce = 0; iForce < nForceCount; iForce++) //loop over force frames
+                                    {
+                                        std::array<float, 9> fdata{ {forces[0][iForce], forces[1][iForce], forces[2][iForce],
+                                            moments[0][iForce], moments[1][iForce], moments[2][iForce],
+                                            cop[0][iForce], cop[1][iForce], cop[2][iForce]} };
+
+                                        if (iPlate == 0) {
+                                            frames_data_front.push_back(fdata);
+                                        }
+                                        else if (iPlate == 1) {
+                                            frames_data_rear.push_back(fdata);
+                                        }
+                                        else if (iPlate == 2) {
+											frames_data_right.push_back(fdata);
+										}
+										else if (iPlate == 3) {
+											frames_data_left.push_back(fdata);
+										}
+                                    
+                                    }
+
                                 }
+                                prevForceMean[iPlate][0] = forceMean[0];
+                                prevForceMean[iPlate][1] = forceMean[1];
+                                prevForceMean[iPlate][2] = forceMean[2];
+
+                                prevMomentMean[iPlate][0] = momentMean[0];
+                                prevMomentMean[iPlate][1] = momentMean[1];
+                                prevMomentMean[iPlate][2] = momentMean[2];
                             }
                         } 
                     }   
