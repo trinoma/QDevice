@@ -129,7 +129,6 @@ namespace
     std::thread rt_thread;
     std::atomic<bool> rt_running{ false };
 
-    /*std::vector< std::array<float, 36> > frames_data;*/
     std::vector< std::array<float, 9> > frames_data_front;
     std::vector< std::array<float, 9> > frames_data_rear;
     std::vector< std::array<float, 9> > frames_data_right;
@@ -430,7 +429,6 @@ namespace
     template<typename T>
     void push_samples(qd_sample_push_fn callback,
         const force_device& fdevice,
-        //const std::size_t fdevice_index,
         const std::size_t sample,
         const std::size_t count,
         const std::vector<std::array<float, 9>>& frames_data_to_push)
@@ -445,7 +443,6 @@ namespace
             {
                 try {
                     const auto& frame = frames_data_to_push.at(sample_index);  // Access frame data safely
-                    //samples.push_back(frame[fdevice_index * 9 + c]);  // Get channel data
                     samples.push_back(frame[c]);
                 }
                 catch (const std::out_of_range& e) {
