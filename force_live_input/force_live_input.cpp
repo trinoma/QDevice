@@ -175,7 +175,7 @@ namespace
 }
 
 
-void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data_front, std::vector< std::array<float, 9> >& frames_data_rear)
+void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data_front, std::vector< std::array<float, 9> >& frames_data_rear, std::vector< std::array<float, 9> >& frames_data_right, std::vector< std::array<float, 9> >& frames_data_left)
 {
     try {
 
@@ -232,6 +232,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
         bool assignFrontToRight = true;
         bool assignRearToRight = true;
+
+        unsigned int nForceCountFront;
+        unsigned int nForceCountRear;
 
         //force and moment angle offset correction factor
         float inclineForceFactor[2][3] = {
@@ -338,6 +341,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                         float forceMean[3] = { 0.0f, 0.0f , 0.0f };
                         float momentMean[3] = { 0.0f, 0.0f , 0.0f };
+
+                        std::vector< std::array<float, 9> > temp_frames_data_front;
+                        std::vector< std::array<float, 9> > temp_frames_data_rear;
 
                         for (unsigned int iPlate = 0; iPlate < nCount; iPlate++) //loop on force plates
                         {
@@ -530,18 +536,176 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                         if (iPlate == 0) {
                                             frames_data_front.push_back(fdata);
+                                            temp_frames_data_front.push_back(fdata);
+                                            nForceCountFront = nForceCount;
                                         }
                                         else if (iPlate == 1) {
                                             frames_data_rear.push_back(fdata);
+                                            temp_frames_data_rear.push_back(fdata);
+                                            nForceCountRear = nForceCount;
                                         }
-                                        else if (iPlate == 2) {
-											frames_data_right.push_back(fdata);
-										}
-										else if (iPlate == 3) {
-											frames_data_left.push_back(fdata);
-										}
                                     
                                     }
+
+                                    if (iPlate == 2) //Right plate
+                                    {
+                                        if (assignFrontToRight == true && plateON[0] == true && assignRearToRight == true && plateON[1] == true)
+                                        {
+                                            for (unsigned int iForce = 0; iForce < std::min(nForceCountFront,nForceCountRear); iForce++) //loop over force frames
+                                            {
+                                                float front_force_norm = sqrt(
+                                                    temp_frames_data_front[iForce][0] * temp_frames_data_front[iForce][0]
+                                                    + temp_frames_data_front[iForce][1] * temp_frames_data_front[iForce][1]
+                                                    + temp_frames_data_front[iForce][2] * temp_frames_data_front[iForce][2]);
+
+                                                float rear_force_norm = sqrt(
+                                                    temp_frames_data_front[iForce][0] * temp_frames_data_front[iForce][0]
+                                                    + temp_frames_data_front[iForce][1] * temp_frames_data_front[iForce][1]
+                                                    + temp_frames_data_front[iForce][2] * temp_frames_data_front[iForce][2]);
+
+                                                std::array<float, 9> fdata{ {
+                                                    temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0],
+                                                    temp_frames_data_front[iForce][1] + temp_frames_data_rear[iForce][1],
+                                                    temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2],
+                                                    temp_frames_data_front[iForce][3] + temp_frames_data_rear[iForce][3],
+                                                    temp_frames_data_front[iForce][4] + temp_frames_data_rear[iForce][4],
+                                                    temp_frames_data_front[iForce][5] + temp_frames_data_rear[iForce][5],
+                                                    (temp_frames_data_front[iForce][6] * front_force_norm + temp_frames_data_rear[iForce][6] * rear_force_norm) / (front_force_norm + rear_force_norm),
+                                                    (temp_frames_data_front[iForce][7] * front_force_norm + temp_frames_data_rear[iForce][7] * rear_force_norm) / (front_force_norm + rear_force_norm),
+                                                    (temp_frames_data_front[iForce][8] * front_force_norm + temp_frames_data_rear[iForce][8] * rear_force_norm) / (front_force_norm + rear_force_norm),
+                                                    } };
+                                                frames_data_right.push_back(fdata);
+                                            }
+                                        }
+                                        else if(assignFrontToRight == true && plateON[0] == true)
+                                        {
+                                            for (unsigned int iForce = 0; iForce < nForceCountFront; iForce++) //loop over force frames
+                                            {
+                                                std::array<float, 9> fdata{ {
+                                                    temp_frames_data_front[iForce][0],
+                                                    temp_frames_data_front[iForce][1],
+                                                    temp_frames_data_front[iForce][2],
+                                                    temp_frames_data_front[iForce][3],
+                                                    temp_frames_data_front[iForce][4],
+                                                    temp_frames_data_front[iForce][5],
+                                                    temp_frames_data_front[iForce][6],
+                                                    temp_frames_data_front[iForce][7],
+                                                    temp_frames_data_front[iForce][8]} };
+
+                                                frames_data_right.push_back(fdata);
+                                            }
+                                        }
+                                        else if (assignRearToRight == true && plateON[1] == true)
+                                        {
+                                            for (unsigned int iForce = 0; iForce < nForceCountRear; iForce++) //loop over force frames
+                                            {
+                                                std::array<float, 9> fdata{ {
+                                                    temp_frames_data_rear[iForce][0],
+                                                    temp_frames_data_rear[iForce][1],
+                                                    temp_frames_data_rear[iForce][2],
+                                                    temp_frames_data_rear[iForce][3],
+                                                    temp_frames_data_rear[iForce][4],
+                                                    temp_frames_data_rear[iForce][5],
+                                                    temp_frames_data_rear[iForce][6],
+                                                    temp_frames_data_rear[iForce][7],
+                                                    temp_frames_data_rear[iForce][8]} };
+
+                                                frames_data_right.push_back(fdata);
+                                            }
+                                        }
+                                        else 
+                                        {
+                                            for (unsigned int iForce = 0; iForce < std::min(nForceCountFront, nForceCountRear); iForce++) //loop over force frames
+                                            {
+                                                std::array<float, 9> fdata{ { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f} };
+
+                                                frames_data_right.push_back(fdata);
+                                            }
+                                        }
+                                        
+                                    }
+
+
+                                    if (iPlate == 3) //Left plate
+                                    {
+                                        if (assignFrontToRight == false && plateON[0] == true && assignRearToRight == false && plateON[1] == true)
+                                        {
+                                            for (unsigned int iForce = 0; iForce < std::min(nForceCountFront, nForceCountRear); iForce++) //loop over force frames
+                                            {
+
+                                                float front_force_norm = sqrt(
+                                                    temp_frames_data_front[iForce][0] * temp_frames_data_front[iForce][0]
+                                                    + temp_frames_data_front[iForce][1] * temp_frames_data_front[iForce][1]
+                                                    + temp_frames_data_front[iForce][2] * temp_frames_data_front[iForce][2]);
+
+                                                float rear_force_norm = sqrt(
+                                                    temp_frames_data_front[iForce][0] * temp_frames_data_front[iForce][0]
+                                                    + temp_frames_data_front[iForce][1] * temp_frames_data_front[iForce][1]
+                                                    + temp_frames_data_front[iForce][2] * temp_frames_data_front[iForce][2]);
+
+                                                std::array<float, 9> fdata{ {
+                                                    temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0],
+                                                    temp_frames_data_front[iForce][1] + temp_frames_data_rear[iForce][1],
+                                                    temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2],
+                                                    temp_frames_data_front[iForce][3] + temp_frames_data_rear[iForce][3],
+                                                    temp_frames_data_front[iForce][4] + temp_frames_data_rear[iForce][4],
+                                                    temp_frames_data_front[iForce][5] + temp_frames_data_rear[iForce][5],
+                                                    (temp_frames_data_front[iForce][6] * front_force_norm + temp_frames_data_rear[iForce][6] * rear_force_norm)/(front_force_norm + rear_force_norm),
+                                                    (temp_frames_data_front[iForce][7] * front_force_norm + temp_frames_data_rear[iForce][7] * rear_force_norm) / (front_force_norm + rear_force_norm),
+                                                    (temp_frames_data_front[iForce][8] * front_force_norm + temp_frames_data_rear[iForce][8] * rear_force_norm) / (front_force_norm + rear_force_norm),
+                                                    } };
+
+                                                frames_data_left.push_back(fdata);
+                                            }
+                                        }
+                                        else if (assignFrontToRight == false && plateON[0] == true)
+                                        {
+                                            for (unsigned int iForce = 0; iForce < nForceCountFront; iForce++) //loop over force frames
+                                            {
+                                                std::array<float, 9> fdata{ {
+                                                    temp_frames_data_front[iForce][0],
+                                                    temp_frames_data_front[iForce][1],
+                                                    temp_frames_data_front[iForce][2],
+                                                    temp_frames_data_front[iForce][3],
+                                                    temp_frames_data_front[iForce][4],
+                                                    temp_frames_data_front[iForce][5],
+                                                    temp_frames_data_front[iForce][6],
+                                                    temp_frames_data_front[iForce][7],
+                                                    temp_frames_data_front[iForce][8]} };
+
+                                                frames_data_left.push_back(fdata);
+                                            }
+                                        }
+                                        else if (assignRearToRight == false && plateON[1] == true)
+                                        {
+                                            for (unsigned int iForce = 0; iForce < nForceCountRear; iForce++) //loop over force frames
+                                            {
+                                                std::array<float, 9> fdata{ {
+                                                    temp_frames_data_rear[iForce][0],
+                                                    temp_frames_data_rear[iForce][1],
+                                                    temp_frames_data_rear[iForce][2],
+                                                    temp_frames_data_rear[iForce][3],
+                                                    temp_frames_data_rear[iForce][4],
+                                                    temp_frames_data_rear[iForce][5],
+                                                    temp_frames_data_rear[iForce][6],
+                                                    temp_frames_data_rear[iForce][7],
+                                                    temp_frames_data_rear[iForce][8]} };
+
+                                                frames_data_left.push_back(fdata);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            for (unsigned int iForce = 0; iForce < std::min(nForceCountFront, nForceCountRear); iForce++) //loop over force frames
+                                            {
+                                                std::array<float, 9> fdata{ { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f} };
+
+                                                frames_data_left.push_back(fdata);
+                                            }
+                                        }
+
+                                    }
+
 
                                 }
                                 prevForceMean[iPlate][0] = forceMean[0];
@@ -552,7 +716,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                 prevMomentMean[iPlate][1] = momentMean[1];
                                 prevMomentMean[iPlate][2] = momentMean[2];
                             }
-                        } 
+                        }
+                        temp_frames_data_front.clear();
+                        temp_frames_data_rear.clear();
                     }   
                 }
             }    
@@ -680,7 +846,7 @@ qd_call_status qd_start_streaming()
     g_pushed_samples_left = 0;
 
     rt_running = true;
-    rt_thread = std::thread(update, std::ref(rt_running), std::ref(frames_data_front), std::ref(frames_data_rear));
+    rt_thread = std::thread(update, std::ref(rt_running), std::ref(frames_data_front), std::ref(frames_data_rear), std::ref(frames_data_right), std::ref(frames_data_left));
     return { qd_call_status_type_ok, nullptr };
 }
 
