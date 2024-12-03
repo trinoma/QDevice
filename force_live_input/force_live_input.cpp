@@ -228,6 +228,12 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
             {0.0f, 0.0f, 0.0f}
         };
 
+        // saving HS position to detect left/right strides
+        float HSposition[2][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f}
+        };
+        bool HS = false;
 
         bool plateON[4] = { false, false, false, false };
 
@@ -345,6 +351,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                         float forceMean[3] = { 0.0f, 0.0f , 0.0f };
                         float momentMean[3] = { 0.0f, 0.0f , 0.0f };
+                        float copMean[3] = { 0.0f, 0.0f , 0.0f };
 
                         std::vector< std::array<float, 9> > temp_frames_data_front;
                         std::vector< std::array<float, 9> > temp_frames_data_rear;
@@ -377,6 +384,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                     float forceSum[3] = { 0.0f, 0.0f , 0.0f };
                                     float momentSum[3] = { 0.0f, 0.0f , 0.0f };
+                                    float copSum[3] = { 0.0f, 0.0f , 0.0f };
 
                                     for (unsigned int iForce = 0; iForce < nForceCount; iForce++) //loop over force frames
                                     {
@@ -410,6 +418,10 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             momentSum[0] += moments[0][iForce];
                                             momentSum[1] += moments[1][iForce];
                                             momentSum[2] += moments[2][iForce];
+
+                                            copSum[0] += cop[0][iForce];
+                                            copSum[1] += cop[1][iForce];
+                                            copSum[2] += cop[2][iForce];
                                         }
                                     }
 
@@ -421,6 +433,10 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     momentMean[0] = momentSum[0] / nForceCount; //X
                                     momentMean[1] = momentSum[1] / nForceCount; //Y
                                     momentMean[2] = momentSum[2] / nForceCount; //Z
+
+                                    copMean[0] = copSum[0] / nForceCount; //X
+                                    copMean[1] = copSum[1] / nForceCount; //Y
+                                    copMean[2] = copSum[2] / nForceCount; //Z
 
                                     if (forceMean[2] < 20) { //if mean Z force on is below 20N
                                         if (prevForceMean[iPlate][2] > 20) { //if previous frame mean Z force was above 20N (offset threshold)
@@ -446,13 +462,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 unloadedMomentBaseline[iPlate][1] = momentBaseline[iPlate][1];
                                                 unloadedMomentBaseline[iPlate][2] = momentBaseline[iPlate][2];
                                             }
-
-                                            if (iPlate == 2) {
-                                                assignRearToRight = false;
-                                            }
-                                            else if (iPlate == 3) {
-                                                assignRearToRight = true;
-                                            }
                                         }
                                         //TODO VERIFIER ASSIGNATION QUAND FORCE sur LEFT
 
@@ -460,11 +469,16 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     else if (forceMean[2] > 20) { //if mean Z force on is above 20N
                                         if (prevForceMean[iPlate][2] < 20) { //if previous frame mean Z force was below 20N (onset threshold)
                                             plateON[iPlate] = true;
-                                            if (iPlate == 2) {
-                                                assignFrontToRight = true;
+                                            if (iPlate == 0) { //front plate heel strike
+                                                HS = true;
                                             }
-                                            else if (iPlate == 3) {
-                                                assignFrontToRight = false;
+                                            if (iPlate == 1) { //rear plate assignment based front plate assignment
+                                                if (assignFrontToRight) {
+                                                    assignRearToRight = true;
+                                                }
+                                                else {
+                                                    assignRearToRight = false;
+                                                }
                                             }
                                         }
                                     }
@@ -514,6 +528,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             momentBaseline[iPlate][2] = unloadedMomentBaseline[iPlate][2] + inclineMomentFactor[iPlate][2] * (treadmillAngle - lastTreadmillAngle);
                                         }
 
+                                        //assign force/moment/cop values
                                         for (unsigned int iForce = 0; iForce < nForceCount; iForce++) { //loop over force frames
                                             if (forces[0] && forces[1] && forces[2])
                                             {
@@ -533,16 +548,8 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                     cop[2][iForce] = 0.0f; //cop Z stays O
                                                 }
                                             }
-                                        }
-                                        printf("\n");
 
-                                    }
-
-
-                                    if (iPlate == 0 || iPlate == 1) //Front/Rear Plate
-                                    {
-                                        for (unsigned int iForce = 0; iForce < nForceCount; iForce++) //loop over force frames
-                                        {
+                                            //create force vector and push data frame
                                             std::array<float, 9> fdata{ {forces[0][iForce], forces[1][iForce], forces[2][iForce],
                                                 moments[0][iForce], moments[1][iForce], moments[2][iForce],
                                                 cop[0][iForce], cop[1][iForce], cop[2][iForce]} };
@@ -558,7 +565,24 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 nForceCountRear = nForceCount;
                                             }
                                         }
+
+                                        if (iPlate == 0 && HS) {
+                                            for (int i = 0; i < 3; i++) {
+                                                HSposition[0][i] = HSposition[1][i];
+                                                HSposition[1][i] = copMean[i];
+                                            }
+                                            if (HSposition[1][0] - HSposition[0][0] < 0) //Right HS if difference negative (in mediolateral) on X
+                                            {
+                                                assignFrontToRight = true;
+                                            }
+                                            else {
+                                                assignFrontToRight = false;
+                                            }
+                                            HS = false;
+                                        }
+
                                     }
+
                                     
                                     //TODO CORRECTIONS UNITES COP ET MOMENTS
 
