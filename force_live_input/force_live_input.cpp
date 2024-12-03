@@ -528,8 +528,8 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                 if (plateON[iPlate] == true)
                                                 {
-                                                    cop[0][iForce] = (((FP_params[iPlate][2] * forces[0][iForce] - moments[1][iForce]) / forces[2][iForce]) + FP_params[iPlate][0]) * 1000; //((ORIGIN[Z] * Force[X] - M[Y]) / Force[Z]) + ORIGIN[X]
-                                                    cop[1][iForce] = (((FP_params[iPlate][2] * forces[1][iForce] + moments[0][iForce]) / forces[2][iForce]) + FP_params[iPlate][1]) * 1000; //((ORIGIN[Z] * Force[Y] + M[X]) / Force[Z]) + ORIGIN[Y]
+                                                    cop[0][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[0][iForce] - moments[1][iForce]) / forces[2][iForce]) + (FP_params[iPlate][0] / 1000)) * 1000; //((ORIGIN[Z] * Force[X] - M[Y]) / Force[Z]) + ORIGIN[X]
+                                                    cop[1][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[1][iForce] + moments[0][iForce]) / forces[2][iForce]) + (FP_params[iPlate][1] / 1000)) * 1000; //((ORIGIN[Z] * Force[Y] + M[X]) / Force[Z]) + ORIGIN[Y]
                                                     cop[2][iForce] = 0.0f; //cop Z stays O
                                                 }
                                             }
@@ -589,9 +589,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                         temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0],
                                                         temp_frames_data_front[iForce][1] + temp_frames_data_rear[iForce][1],
                                                         temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2],
-                                                        cop_y * (temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2]),
-                                                        - cop_x * temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2],
-                                                        (temp_frames_data_front[iForce][1] + temp_frames_data_rear[iForce][1]) * cop_x - (temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0]) * cop_y,
+                                                        (cop_y / 1000) * (temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2]),
+                                                        - (cop_x / 1000) * (temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2]),
+                                                        (temp_frames_data_front[iForce][1] + temp_frames_data_rear[iForce][1]) * (cop_x / 1000) - (temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0]) * (cop_y / 1000),
                                                         cop_x,
                                                         cop_y,
                                                         cop_z,
@@ -611,9 +611,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                         temp_frames_data_front[iForce][0],
                                                         temp_frames_data_front[iForce][1],
                                                         temp_frames_data_front[iForce][2],
-                                                        temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][7] + front_plate_position[1]),
-                                                        - temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][6] + front_plate_position[0]),
-                                                        temp_frames_data_front[iForce][1] * (temp_frames_data_front[iForce][6] + front_plate_position[0]) - temp_frames_data_front[iForce][0] * (temp_frames_data_front[iForce][7] + front_plate_position[1]),
+                                                        temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][7] + front_plate_position[1]) / 1000,
+                                                        - temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][6] + front_plate_position[0]) / 1000,
+                                                        temp_frames_data_front[iForce][1] * ((temp_frames_data_front[iForce][6] + front_plate_position[0]) / 1000) - temp_frames_data_front[iForce][0] * ((temp_frames_data_front[iForce][7] + front_plate_position[1]) / 1000),
                                                         temp_frames_data_front[iForce][6] + front_plate_position[0],
                                                         temp_frames_data_front[iForce][7] + front_plate_position[1],
                                                         temp_frames_data_front[iForce][8] + front_plate_position[2]} };
@@ -632,9 +632,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                         temp_frames_data_rear[iForce][0],
                                                         temp_frames_data_rear[iForce][1],
                                                         temp_frames_data_rear[iForce][2],
-                                                        temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][7] + rear_plate_position[1]),
-                                                        -temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][6] + rear_plate_position[0]),
-                                                        temp_frames_data_rear[iForce][1] * (temp_frames_data_rear[iForce][6] + rear_plate_position[0]) - temp_frames_data_rear[iForce][0] * (temp_frames_data_rear[iForce][7] + rear_plate_position[1]),
+                                                        temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][7] + rear_plate_position[1]) / 1000,
+                                                        -temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][6] + rear_plate_position[0]) / 1000,
+                                                        temp_frames_data_rear[iForce][1] * ((temp_frames_data_rear[iForce][6] + rear_plate_position[0]) / 1000) - temp_frames_data_rear[iForce][0] * ((temp_frames_data_rear[iForce][7] + rear_plate_position[1]) / 1000),
                                                         temp_frames_data_rear[iForce][6] + rear_plate_position[0],
                                                         temp_frames_data_rear[iForce][7] + rear_plate_position[1],
                                                         temp_frames_data_rear[iForce][8] + rear_plate_position[2]} };
@@ -683,9 +683,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                         temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0],
                                                         temp_frames_data_front[iForce][1] + temp_frames_data_rear[iForce][1],
                                                         temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2],
-                                                        cop_y * (temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2]),
-                                                        -cop_x * temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2],
-                                                        (temp_frames_data_front[iForce][1] + temp_frames_data_rear[iForce][1]) * cop_x - (temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0]) * cop_y,
+                                                        (cop_y / 1000) * (temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2]),
+                                                        -(cop_x / 1000) * (temp_frames_data_front[iForce][2] + temp_frames_data_rear[iForce][2]),
+                                                        (temp_frames_data_front[iForce][1] + temp_frames_data_rear[iForce][1]) * (cop_x / 1000) - (temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0]) * (cop_y / 1000),
                                                         cop_x,
                                                         cop_y,
                                                         cop_z,
@@ -705,9 +705,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                         temp_frames_data_front[iForce][0],
                                                         temp_frames_data_front[iForce][1],
                                                         temp_frames_data_front[iForce][2],
-                                                        temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][7] + front_plate_position[1]),
-                                                        -temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][6] + front_plate_position[0]),
-                                                        temp_frames_data_front[iForce][1] * (temp_frames_data_front[iForce][6] + front_plate_position[0]) - temp_frames_data_front[iForce][0] * (temp_frames_data_front[iForce][7] + front_plate_position[1]),
+                                                        temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][7] + front_plate_position[1]) / 1000,
+                                                        -temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][6] + front_plate_position[0]) / 1000,
+                                                        temp_frames_data_front[iForce][1] * ((temp_frames_data_front[iForce][6] + front_plate_position[0]) / 1000) - temp_frames_data_front[iForce][0] * ((temp_frames_data_front[iForce][7] + front_plate_position[1]) / 1000),
                                                         temp_frames_data_front[iForce][6] + front_plate_position[0],
                                                         temp_frames_data_front[iForce][7] + front_plate_position[1],
                                                         temp_frames_data_front[iForce][8] + front_plate_position[2]} };
@@ -726,9 +726,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                         temp_frames_data_rear[iForce][0],
                                                         temp_frames_data_rear[iForce][1],
                                                         temp_frames_data_rear[iForce][2],
-                                                        temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][7] + rear_plate_position[1]),
-                                                        -temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][6] + rear_plate_position[0]),
-                                                        temp_frames_data_rear[iForce][1] * (temp_frames_data_rear[iForce][6] + rear_plate_position[0]) - temp_frames_data_rear[iForce][0] * (temp_frames_data_rear[iForce][7] + rear_plate_position[1]),
+                                                        temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][7] + rear_plate_position[1]) / 1000,
+                                                        -temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][6] + rear_plate_position[0]) / 1000,
+                                                        temp_frames_data_rear[iForce][1] * ((temp_frames_data_rear[iForce][6] + rear_plate_position[0]) / 1000) - temp_frames_data_rear[iForce][0] * ((temp_frames_data_rear[iForce][7] + rear_plate_position[1]) / 1000),
                                                         temp_frames_data_rear[iForce][6] + rear_plate_position[0],
                                                         temp_frames_data_rear[iForce][7] + rear_plate_position[1],
                                                         temp_frames_data_rear[iForce][8] + rear_plate_position[2]} };
