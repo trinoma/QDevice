@@ -227,6 +227,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
             {0.0f, 0.0f, 0.0f}
         };
         bool HS = false;
+        bool TO = false;
 
         bool plateON[4] = { false, false, false, false };
 
@@ -430,6 +431,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     if (forceMean[2] < 20) { //if mean Z force on is below 20N
                                         if (prevForceMean[iPlate][2] > 20) { //if previous frame mean Z force was above 20N (offset threshold)
                                             plateON[iPlate] = false;
+                                            TO = true;
 
                                             // reinitialize factors and baseline at foot off
                                             if (iPlate == 0 || iPlate == 1) // front/rear plates
@@ -537,14 +539,20 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 moments[1][iForce] -= momentBaseline[iPlate][1];
                                                 moments[2][iForce] -= momentBaseline[iPlate][2];
 
-                                                cop[2][iForce] = 1.0f; //cop Z stays O
-
                                                 if (plateON[iPlate] == true)
                                                 {
-                                                    cop[0][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[0][iForce] - moments[1][iForce]) / forces[2][iForce]) + (FP_params[iPlate][0] / 1000)) * 1000; //((ORIGIN[Z] * Force[X] - M[Y]) / Force[Z]) + ORIGIN[X]
-                                                    cop[1][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[1][iForce] + moments[0][iForce]) / forces[2][iForce]) + (FP_params[iPlate][1] / 1000)) * 1000; //((ORIGIN[Z] * Force[Y] + M[X]) / Force[Z]) + ORIGIN[Y]
-                                                    cop[2][iForce] = 0.0f; //cop Z stays O
-                                                   
+                                                    if (forces[2][iForce] > 20) 
+                                                    {
+                                                        cop[0][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[0][iForce] - moments[1][iForce]) / forces[2][iForce]) + (FP_params[iPlate][0] / 1000)) * 1000; //((ORIGIN[Z] * Force[X] - M[Y]) / Force[Z]) + ORIGIN[X]
+                                                        cop[1][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[1][iForce] + moments[0][iForce]) / forces[2][iForce]) + (FP_params[iPlate][1] / 1000)) * 1000; //((ORIGIN[Z] * Force[Y] + M[X]) / Force[Z]) + ORIGIN[Y]
+                                                        cop[2][iForce] = 0.0f; //cop Z stays O
+                                                    }
+                                                    else 
+                                                    {
+                                                        cop[0][iForce] = 0.0f;
+                                                        cop[0][iForce] = 0.0f;
+                                                        cop[0][iForce] = 0.0f;
+                                                    }
                                                 }
                                             }
 
