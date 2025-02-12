@@ -221,13 +221,23 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
             {0.0f, 0.0f, 0.0f}
         };
 
-        // saving HS position to detect left/right strides
-        float HSposition[2][3] = {
+        float prevMomentMean[4][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
             {0.0f, 0.0f, 0.0f},
             {0.0f, 0.0f, 0.0f}
         };
-        bool HS = false;
-        bool TO = false;
+
+        // saving HS position to detect left/right strides
+        float FORposition[2][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f}
+        };
+
+        bool FonR = false; //foot on rear plate detection 
+        bool FoffR = false; //foot off rear plate detection 
+        unsigned int nFramesOFF = 0;
+        unsigned int nFramesON = 0;
 
         bool plateON[4] = { false, false, false, false };
 
@@ -240,8 +250,8 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         unsigned int nForceCountFront;
         unsigned int nForceCountRear;
 
-        unsigned int nUnloadedFramesRight = 0;
-        unsigned int nUnloadedFramesLeft = 0;
+        unsigned int nUnloadedFramesFront = 0;
+        unsigned int nUnloadedFramesRear = 0;
         unsigned int nUnloadedFrames;
 
         //force and moment angle offset correction factor
@@ -431,7 +441,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     if (forceMean[2] < 20) { //if mean Z force on is below 20N
                                         if (prevForceMean[iPlate][2] > 20) { //if previous frame mean Z force was above 20N (offset threshold)
                                             plateON[iPlate] = false;
-                                            TO = true;
+                                            if (iPlate == 1) { //rear plate foot off
+                                                FoffR = true;
+                                            }
 
                                             // reinitialize factors and baseline at foot off
                                             if (iPlate == 0 || iPlate == 1) // front/rear plates
@@ -458,18 +470,12 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     else if (forceMean[2] > 20) { //if mean Z force on is above 20N
                                         if (prevForceMean[iPlate][2] < 20) { //if previous frame mean Z force was below 20N (onset threshold)
                                             plateON[iPlate] = true;
-                                            if (iPlate == 0) { //front plate heel strike
-                                                HS = true;
-                                                nUnloadedFramesRight = 0;
+                                            if (iPlate == 0) {
+                                                nUnloadedFramesFront = 0;
                                             }
-                                            if (iPlate == 1) { //rear plate assignment based front plate assignment
-                                                if (assignFrontToRight) {
-                                                    assignRearToRight = true;
-                                                }
-                                                else {
-                                                    assignRearToRight = false;
-                                                }
-                                                nUnloadedFramesLeft = 0;
+                                            if (iPlate == 1) { //rear plate foot on
+                                                FonR = true;
+                                                nUnloadedFramesRear = 0;
                                             }
                                         }
                                     }
@@ -482,40 +488,42 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                         if (plateON[iPlate] == false)
                                         {
                                             if (iPlate == 0) {
-                                                nUnloadedFramesRight += 1;
-                                                nUnloadedFrames = nUnloadedFramesRight;
+                                                nUnloadedFramesFront += 1;
+                                                nUnloadedFrames = nUnloadedFramesFront;
                                             }
                                             else if (iPlate == 1){
-                                                nUnloadedFramesLeft += 1;
-                                                nUnloadedFrames = nUnloadedFramesLeft;
+                                                nUnloadedFramesRear += 1;
+                                                nUnloadedFrames = nUnloadedFramesRear;
                                             }
-                                            unloadedForceBaseline[iPlate][0] = (forceMean[0] + nUnloadedFrames * unloadedForceBaseline[iPlate][0]) / (nUnloadedFrames + 1);
-                                            unloadedForceBaseline[iPlate][1] = (forceMean[1] + nUnloadedFrames * unloadedForceBaseline[iPlate][1]) / (nUnloadedFrames + 1);
-                                            unloadedForceBaseline[iPlate][2] = (forceMean[2] + nUnloadedFrames * unloadedForceBaseline[iPlate][2]) / (nUnloadedFrames + 1);
+                                            if (nUnloadedFrames > 2) { // first and last frame not taken into account for mean computation
+                                                unloadedForceBaseline[iPlate][0] = (prevForceMean[iPlate][0] + nUnloadedFrames * unloadedForceBaseline[iPlate][0]) / (nUnloadedFrames + 1);
+                                                unloadedForceBaseline[iPlate][1] = (prevForceMean[iPlate][1] + nUnloadedFrames * unloadedForceBaseline[iPlate][1]) / (nUnloadedFrames + 1);
+                                                unloadedForceBaseline[iPlate][2] = (prevForceMean[iPlate][2] + nUnloadedFrames * unloadedForceBaseline[iPlate][2]) / (nUnloadedFrames + 1);
 
 
-                                            forceBaseline[iPlate][0] = unloadedForceBaseline[iPlate][0];
-                                            forceBaseline[iPlate][1] = unloadedForceBaseline[iPlate][1];
-                                            forceBaseline[iPlate][2] = unloadedForceBaseline[iPlate][2];
+                                                forceBaseline[iPlate][0] = unloadedForceBaseline[iPlate][0];
+                                                forceBaseline[iPlate][1] = unloadedForceBaseline[iPlate][1];
+                                                forceBaseline[iPlate][2] = unloadedForceBaseline[iPlate][2];
 
-                                            unloadedMomentBaseline[iPlate][0] = (momentMean[0] + nUnloadedFrames * unloadedMomentBaseline[iPlate][0]) / (nUnloadedFrames + 1);
-                                            unloadedMomentBaseline[iPlate][1] = (momentMean[1] + nUnloadedFrames * unloadedMomentBaseline[iPlate][1]) / (nUnloadedFrames + 1);
-                                            unloadedMomentBaseline[iPlate][2] = (momentMean[2] + nUnloadedFrames * unloadedMomentBaseline[iPlate][2]) / (nUnloadedFrames + 1);
+                                                unloadedMomentBaseline[iPlate][0] = (prevMomentMean[iPlate][0] + nUnloadedFrames * unloadedMomentBaseline[iPlate][0]) / (nUnloadedFrames + 1);
+                                                unloadedMomentBaseline[iPlate][1] = (prevMomentMean[iPlate][1] + nUnloadedFrames * unloadedMomentBaseline[iPlate][1]) / (nUnloadedFrames + 1);
+                                                unloadedMomentBaseline[iPlate][2] = (prevMomentMean[iPlate][2] + nUnloadedFrames * unloadedMomentBaseline[iPlate][2]) / (nUnloadedFrames + 1);
 
-                                            momentBaseline[iPlate][0] = unloadedMomentBaseline[iPlate][0];
-                                            momentBaseline[iPlate][1] = unloadedMomentBaseline[iPlate][1];
-                                            momentBaseline[iPlate][2] = unloadedMomentBaseline[iPlate][2];
+                                                momentBaseline[iPlate][0] = unloadedMomentBaseline[iPlate][0];
+                                                momentBaseline[iPlate][1] = unloadedMomentBaseline[iPlate][1];
+                                                momentBaseline[iPlate][2] = unloadedMomentBaseline[iPlate][2];
 
-                                            if (abs(treadmillAngle) > 0.5f)
-                                            {
-                                                inclineForceFactor[iPlate][0] = ((forceMean[0] / treadmillAngle) + inclineForceFactor[iPlate][0]) / 2;
-                                                inclineForceFactor[iPlate][1] = ((forceMean[1] / treadmillAngle) + inclineForceFactor[iPlate][1]) / 2;
-                                                inclineForceFactor[iPlate][2] = ((forceMean[2] / treadmillAngle) + inclineForceFactor[iPlate][2]) / 2;
-                                                inclineMomentFactor[iPlate][0] = ((momentMean[0] / treadmillAngle) + inclineMomentFactor[iPlate][0]) / 2;
-                                                inclineMomentFactor[iPlate][1] = ((momentMean[1] / treadmillAngle) + inclineMomentFactor[iPlate][1]) / 2;
-                                                inclineMomentFactor[iPlate][2] = ((momentMean[2] / treadmillAngle) + inclineMomentFactor[iPlate][2]) / 2;
+                                                if (abs(treadmillAngle) > 0.5f)
+                                                {
+                                                    inclineForceFactor[iPlate][0] = ((prevForceMean[iPlate][0] / treadmillAngle) + inclineForceFactor[iPlate][0]) / 2;
+                                                    inclineForceFactor[iPlate][1] = ((prevForceMean[iPlate][1] / treadmillAngle) + inclineForceFactor[iPlate][1]) / 2;
+                                                    inclineForceFactor[iPlate][2] = ((prevForceMean[iPlate][2] / treadmillAngle) + inclineForceFactor[iPlate][2]) / 2;
+                                                    inclineMomentFactor[iPlate][0] = ((prevMomentMean[iPlate][0] / treadmillAngle) + inclineMomentFactor[iPlate][0]) / 2;
+                                                    inclineMomentFactor[iPlate][1] = ((prevMomentMean[iPlate][1] / treadmillAngle) + inclineMomentFactor[iPlate][1]) / 2;
+                                                    inclineMomentFactor[iPlate][2] = ((prevMomentMean[iPlate][2] / treadmillAngle) + inclineMomentFactor[iPlate][2]) / 2;
+                                                }
+                                                lastTreadmillAngle = treadmillAngle;
                                             }
-                                            lastTreadmillAngle = treadmillAngle;
                                         }
                                         else {
                                             forceBaseline[iPlate][0] = unloadedForceBaseline[iPlate][0] + inclineForceFactor[iPlate][0] * (treadmillAngle - lastTreadmillAngle);
@@ -573,19 +581,37 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             }
                                         }
 
-                                        if (iPlate == 0 && HS) {
-                                            for (int i = 0; i < 3; i++) {
-                                                HSposition[0][i] = HSposition[1][i];
-                                                HSposition[1][i] = copMean[i];
+                                        if (iPlate == 1 && FonR) {
+                                            nFramesON += 1;
+                                            if (nFramesON == 3) { //2 frames temporisation from Rear plate foot on before changing force assignment
+                                                for (int i = 0; i < 3; i++) {
+                                                    FORposition[0][i] = FORposition[1][i];
+                                                    FORposition[1][i] = copMean[i];
+                                                }
+                                                if (FORposition[1][0] - FORposition[0][0] < 0) //Right foot if difference negative (in mediolateral) on X
+                                                {
+                                                    assignFrontToRight = false;
+                                                }
+                                                else {
+                                                    assignFrontToRight = true;
+                                                }
+                                                FonR = false;
+                                                nFramesON = 0;
                                             }
-                                            if (HSposition[1][0] - HSposition[0][0] < 0) //Right HS if difference negative (in mediolateral) on X
-                                            {
-                                                assignFrontToRight = true;
+                                        }
+
+                                        if (iPlate == 1 && FoffR) {
+                                            nFramesOFF += 1;
+                                            if (nFramesOFF == 3) { //2 frames temporisation from Rear plate foot off before changing force assignment
+                                                if (assignFrontToRight) {
+                                                    assignRearToRight = true;
+                                                }
+                                                else {
+                                                    assignRearToRight = false;
+                                                }
+                                                FoffR = false;
+                                                nFramesOFF = 0;               
                                             }
-                                            else {
-                                                assignFrontToRight = false;
-                                            }
-                                            HS = false;
                                         }
 
                                     }
@@ -595,7 +621,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                     if (iPlate == 2) //Right plate
                                     {
-                                        if (assignFrontToRight == true && plateON[0] == true && assignRearToRight == true && plateON[1] == true)
+                                        if (assignFrontToRight == true  && assignRearToRight == true)
                                         {
                                             if (temp_frames_data_front.size() >= std::min(nForceCountFront,nForceCountRear) && temp_frames_data_rear.size() >= std::min(nForceCountFront, nForceCountRear))
                                             {
@@ -618,7 +644,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 }
                                             }  
                                         }
-                                        else if(assignFrontToRight == true && plateON[0] == true)
+                                        else if(assignFrontToRight == true)
                                         {
                                             if (temp_frames_data_front.size() >= nForceCountFront)
                                             {
@@ -651,7 +677,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 }
                                             }  
                                         }
-                                        else if (assignRearToRight == true && plateON[1] == true)
+                                        else if (assignRearToRight == true)
                                         {
                                             if (temp_frames_data_rear.size() >= nForceCountRear)
                                             {
@@ -699,7 +725,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                     if (iPlate == 3) //Left plate
                                     {
-                                        if (assignFrontToRight == false && plateON[0] == true && assignRearToRight == false && plateON[1] == true)
+                                        if (assignFrontToRight == false && assignRearToRight == false)
                                         {
                                             if (temp_frames_data_front.size() >= std::min(nForceCountFront, nForceCountRear) && temp_frames_data_rear.size() >= std::min(nForceCountFront, nForceCountRear))
                                             {
@@ -722,7 +748,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 }
                                             } 
                                         }
-                                        else if (assignFrontToRight == false && plateON[0] == true)
+                                        else if (assignFrontToRight == false)
                                         {
                                             if (temp_frames_data_front.size() >= nForceCountFront)
                                             {
@@ -755,7 +781,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 }
                                             }  
                                         }
-                                        else if (assignRearToRight == false && plateON[1] == true)
+                                        else if (assignRearToRight == false)
                                         {
                                             if (temp_frames_data_rear.size() >= nForceCountRear)
                                             {
@@ -799,9 +825,14 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                         }
 
                                     }
+                                    // saving mean force and moment data for next frame
                                     prevForceMean[iPlate][0] = forceMean[0];
                                     prevForceMean[iPlate][1] = forceMean[1];
                                     prevForceMean[iPlate][2] = forceMean[2];
+
+                                    prevMomentMean[iPlate][0] = momentMean[0];
+                                    prevMomentMean[iPlate][1] = momentMean[1];
+                                    prevMomentMean[iPlate][2] = momentMean[2];
                                 }
                             }
                         }
