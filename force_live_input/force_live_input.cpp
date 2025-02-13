@@ -234,10 +234,10 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
             {0.0f, 0.0f, 0.0f}
         };
 
-        bool FonR = false; //foot on rear plate detection 
+        bool FoffF = false; //foot off front plate detection 
         bool FoffR = false; //foot off rear plate detection 
-        unsigned int nFramesOFF = 0;
-        unsigned int nFramesON = 0;
+        unsigned int nFramesOffR = 0;
+        unsigned int nFramesOffF = 0;
 
         bool plateON[4] = { false, false, false, false };
 
@@ -441,6 +441,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     if (forceMean[2] < 20) { //if mean Z force on is below 20N
                                         if (prevForceMean[iPlate][2] > 20) { //if previous frame mean Z force was above 20N (offset threshold)
                                             plateON[iPlate] = false;
+                                            if (iPlate == 0) { //rear plate foot off
+                                                FoffF = true;
+                                            }
                                             if (iPlate == 1) { //rear plate foot off
                                                 FoffR = true;
                                             }
@@ -474,7 +477,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 nUnloadedFramesFront = 0;
                                             }
                                             if (iPlate == 1) { //rear plate foot on
-                                                FonR = true;
                                                 nUnloadedFramesRear = 0;
                                             }
                                         }
@@ -581,9 +583,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             }
                                         }
 
-                                        if (iPlate == 1 && FonR) {
-                                            nFramesON += 1;
-                                            if (nFramesON == 3) { //2 frames temporisation from Rear plate foot on before changing force assignment
+                                        if (iPlate == 1 && FoffF) {
+                                            nFramesOffF += 1;
+                                            if (nFramesOffF == 3) { //2 frames temporisation from Rear plate foot on before changing force assignment
                                                 for (int i = 0; i < 3; i++) {
                                                     FORposition[0][i] = FORposition[1][i];
                                                     FORposition[1][i] = copMean[i];
@@ -595,14 +597,14 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 else {
                                                     assignFrontToRight = true;
                                                 }
-                                                FonR = false;
-                                                nFramesON = 0;
+                                                FoffF = false;
+                                                nFramesOffF = 0;
                                             }
                                         }
 
                                         if (iPlate == 1 && FoffR) {
-                                            nFramesOFF += 1;
-                                            if (nFramesOFF == 3) { //2 frames temporisation from Rear plate foot off before changing force assignment
+                                            nFramesOffR += 1;
+                                            if (nFramesOffR == 3) { //2 frames temporisation from Rear plate foot off before changing force assignment
                                                 if (assignFrontToRight) {
                                                     assignRearToRight = true;
                                                 }
@@ -610,7 +612,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                     assignRearToRight = false;
                                                 }
                                                 FoffR = false;
-                                                nFramesOFF = 0;               
+                                                nFramesOffR = 0;               
                                             }
                                         }
 
