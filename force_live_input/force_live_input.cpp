@@ -564,6 +564,12 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                         cop[0][iForce] = 0.0f;
                                                     }
                                                 }
+                                                else
+                                                {
+                                                    cop[0][iForce] = 0.0f;
+                                                    cop[0][iForce] = 0.0f;
+                                                    cop[0][iForce] = 0.0f;
+                                                }
                                             }
 
                                             //create force vector and push data frame
