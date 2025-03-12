@@ -670,17 +670,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                     std::array<float, 9> fdata{ {f_x,f_y,f_z,m_x,m_y,m_z,cop_x,cop_y,cop_z} };
 
-                                                    /*std::array<float, 9> fdata{ {
-                                                        temp_frames_data_front[iForce][0],
-                                                        temp_frames_data_front[iForce][1],
-                                                        temp_frames_data_front[iForce][2],
-                                                        temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][7] + front_plate_position[1]) / 1000,
-                                                        - temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][6] + front_plate_position[0]) / 1000,
-                                                        temp_frames_data_front[iForce][1] * ((temp_frames_data_front[iForce][6] + front_plate_position[0]) / 1000) - temp_frames_data_front[iForce][0] * ((temp_frames_data_front[iForce][7] + front_plate_position[1]) / 1000),
-                                                        temp_frames_data_front[iForce][6] + front_plate_position[0],
-                                                        temp_frames_data_front[iForce][7] + front_plate_position[1],
-                                                        temp_frames_data_front[iForce][8] + front_plate_position[2]} };*/
-
                                                     frames_data_right.push_back(fdata);
                                                 }
                                             }  
@@ -702,17 +691,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                     float cop_z = 0;
 
                                                     std::array<float, 9> fdata{ {f_x,f_y,f_z,m_x,m_y,m_z,cop_x,cop_y,cop_z} };
-
-                                                    //std::array<float, 9> fdata{ {
-                                                    //    temp_frames_data_rear[iForce][0],
-                                                    //    temp_frames_data_rear[iForce][1],
-                                                    //    temp_frames_data_rear[iForce][2],
-                                                    //    temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][7] + rear_plate_position[1]) / 1000,
-                                                    //    -temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][6] + rear_plate_position[0]) / 1000,
-                                                    //    temp_frames_data_rear[iForce][1] * ((temp_frames_data_rear[iForce][6] + rear_plate_position[0]) / 1000) - temp_frames_data_rear[iForce][0] * ((temp_frames_data_rear[iForce][7] + rear_plate_position[1]) / 1000),
-                                                    //    temp_frames_data_rear[iForce][6] + rear_plate_position[0],
-                                                    //    temp_frames_data_rear[iForce][7] + rear_plate_position[1],
-                                                    //    temp_frames_data_rear[iForce][8] + rear_plate_position[2]} };
 
                                                     frames_data_right.push_back(fdata);
                                                 }
@@ -762,16 +740,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             {
                                                 for (unsigned int iForce = 0; iForce < nForceCountFront; iForce++) //loop over force frames
                                                 {
-                                                    /*std::array<float, 9> fdata{ {
-                                                        temp_frames_data_front[iForce][0],
-                                                        temp_frames_data_front[iForce][1],
-                                                        temp_frames_data_front[iForce][2],
-                                                        temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][7] + front_plate_position[1]) / 1000,
-                                                        -temp_frames_data_front[iForce][2] * (temp_frames_data_front[iForce][6] + front_plate_position[0]) / 1000,
-                                                        temp_frames_data_front[iForce][1] * ((temp_frames_data_front[iForce][6] + front_plate_position[0]) / 1000) - temp_frames_data_front[iForce][0] * ((temp_frames_data_front[iForce][7] + front_plate_position[1]) / 1000),
-                                                        temp_frames_data_front[iForce][6] + front_plate_position[0],
-                                                        temp_frames_data_front[iForce][7] + front_plate_position[1],
-                                                        temp_frames_data_front[iForce][8] + front_plate_position[2]} };*/
 
                                                     float f_x = temp_frames_data_front[iForce][0];
                                                     float f_y = temp_frames_data_front[iForce][1];
@@ -795,16 +763,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             {
                                                 for (unsigned int iForce = 0; iForce < nForceCountRear; iForce++) //loop over force frames
                                                 {
-                                                    /*std::array<float, 9> fdata{ {
-                                                        temp_frames_data_rear[iForce][0],
-                                                        temp_frames_data_rear[iForce][1],
-                                                        temp_frames_data_rear[iForce][2],
-                                                        temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][7] + rear_plate_position[1]) / 1000,
-                                                        -temp_frames_data_rear[iForce][2] * (temp_frames_data_rear[iForce][6] + rear_plate_position[0]) / 1000,
-                                                        temp_frames_data_rear[iForce][1] * ((temp_frames_data_rear[iForce][6] + rear_plate_position[0]) / 1000) - temp_frames_data_rear[iForce][0] * ((temp_frames_data_rear[iForce][7] + rear_plate_position[1]) / 1000),
-                                                        temp_frames_data_rear[iForce][6] + rear_plate_position[0],
-                                                        temp_frames_data_rear[iForce][7] + rear_plate_position[1],
-                                                        temp_frames_data_rear[iForce][8] + rear_plate_position[2]} };*/
 
                                                     float f_x = temp_frames_data_rear[iForce][0];
                                                     float f_y = temp_frames_data_rear[iForce][1];
