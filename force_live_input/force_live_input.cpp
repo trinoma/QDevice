@@ -37,7 +37,7 @@ namespace
     const std::string DEVICE_MANUFACTURER = "TRINOMA";
     const std::string DEVICE_PRODUCT = "Test Live Force Input Product";
     const std::string DEVICE_MODEL = "Test Live Force Input Model";
-    constexpr auto DEVICE_FREQUENCY = 100;
+    constexpr auto DEVICE_FREQUENCY = 1000;
 
     struct force_plate_channel
     {
@@ -127,7 +127,7 @@ namespace
     };
 
     std::thread rt_thread;
-    std::atomic<bool> rt_running {false};
+    std::atomic<bool> rt_running{ false };
 
     std::vector< std::array<float, 9> > frames_data_front;
     std::vector< std::array<float, 9> > frames_data_rear;
@@ -175,7 +175,7 @@ namespace
 }
 
 
-void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data)
+void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data_front, std::vector< std::array<float, 9> >& frames_data_rear, std::vector< std::array<float, 9> >& frames_data_right, std::vector< std::array<float, 9> >& frames_data_left)
 {
     try {
 
@@ -314,7 +314,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
             if (!streamFrames)
             {
-                if (!rtProtocol.StreamFrames(CRTProtocol::RateAllFrames, 0, udpPort, NULL, CRTProtocol::cComponentForce))
+                if (!rtProtocol.StreamFrames(CRTProtocol::RateAllFrames, 0, udpPort, NULL, components))
                 {
                     printf("rtProtocol.StreamFrames: %s\n\n", rtProtocol.GetErrorString());
                     //rtProtocol.GetErrorString();
