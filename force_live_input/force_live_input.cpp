@@ -37,7 +37,7 @@ namespace
     const std::string DEVICE_MANUFACTURER = "TRINOMA";
     const std::string DEVICE_PRODUCT = "Test Live Force Input Product";
     const std::string DEVICE_MODEL = "Test Live Force Input Model";
-    constexpr auto DEVICE_FREQUENCY = 1000;
+    constexpr auto DEVICE_FREQUENCY = 100;
 
     struct force_plate_channel
     {
@@ -108,26 +108,26 @@ namespace
             }
         },
         {
-			"Left",
-			{ 0.0f, 0.0f, 0.0f },
-			{ 0.0f, 0.0f, 0.0f },
+            "Left",
+            { 0.0f, 0.0f, 0.0f },
+            { 0.0f, 0.0f, 0.0f },
             0.635f, 1.2466f, 0.0f,
-			{
-				{ "Force X", qd_channel_unit_newtons },
-				{ "Force Y", qd_channel_unit_newtons },
-				{ "Force Z", qd_channel_unit_newtons },
-				{ "Moment X", qd_channel_unit_newton_meters },
-				{ "Moment Y", qd_channel_unit_newton_meters },
-				{ "Moment Z", qd_channel_unit_newton_meters },
-				{ "Application X", qd_channel_unit_millimeters },
-				{ "Application Y", qd_channel_unit_millimeters },
-				{ "Application Z", qd_channel_unit_millimeters }
-			}
-		}
+            {
+                { "Force X", qd_channel_unit_newtons },
+                { "Force Y", qd_channel_unit_newtons },
+                { "Force Z", qd_channel_unit_newtons },
+                { "Moment X", qd_channel_unit_newton_meters },
+                { "Moment Y", qd_channel_unit_newton_meters },
+                { "Moment Z", qd_channel_unit_newton_meters },
+                { "Application X", qd_channel_unit_millimeters },
+                { "Application Y", qd_channel_unit_millimeters },
+                { "Application Z", qd_channel_unit_millimeters }
+            }
+        }
     };
 
     std::thread rt_thread;
-    std::atomic<bool> rt_running{ false };
+    std::atomic<bool> rt_running {false};
 
     std::vector< std::array<float, 9> > frames_data_front;
     std::vector< std::array<float, 9> > frames_data_rear;
@@ -175,7 +175,7 @@ namespace
 }
 
 
-void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data_front, std::vector< std::array<float, 9> >& frames_data_rear, std::vector< std::array<float, 9> >& frames_data_right, std::vector< std::array<float, 9> >& frames_data_left)
+void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data)
 {
     try {
 
@@ -204,7 +204,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         const float rear_c = -0.0415036f;
 
         //forceplate positions in mm
-        const float front_plate_position[3] = {0.0f, 359.55f, 0.0f};
+        const float front_plate_position[3] = { 0.0f, 359.55f, 0.0f };
         const float rear_plate_position[3] = { 0.0f, -359.55f, 0.0f };
 
 
@@ -285,7 +285,12 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
             {0.0f, 0.0f, 0.0f},
             {0.0f, 0.0f, 0.0f},
         };
-        
+
+        bool late_data_front = false;
+        bool late_data_rear = false;
+        int frame_diff;
+
+        std::vector< std::array<float, 9> > saved_frames_data;
 
         while (running) {
 
@@ -309,7 +314,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
             if (!streamFrames)
             {
-                if (!rtProtocol.StreamFrames(CRTProtocol::RateAllFrames, 0, udpPort, NULL, components))
+                if (!rtProtocol.StreamFrames(CRTProtocol::RateAllFrames, 0, udpPort, NULL, CRTProtocol::cComponentForce))
                 {
                     printf("rtProtocol.StreamFrames: %s\n\n", rtProtocol.GetErrorString());
                     //rtProtocol.GetErrorString();
@@ -329,7 +334,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                     //Get 6DOF Euler data
                     float fX, fY, fZ, fAng1, fAng2, fAng3;
-                    
+
                     unsigned int RBCount = rtPacket->Get6DOFEulerBodyCount();
 
                     if (RBCount > 0)
@@ -349,7 +354,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                         }
                     }
 
-                    
+
 
                     unsigned int nCount = rtPacket->GetForcePlateCount();
 
@@ -358,6 +363,26 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                         std::vector< std::array<float, 9> > temp_frames_data_front;
                         std::vector< std::array<float, 9> > temp_frames_data_rear;
+
+                        //store data from previous frame if there was a difference between sizes
+                        if (late_data_front == true)
+                        {
+                            for (unsigned i = 0; i < saved_frames_data.size(); i++)
+                            {
+                                temp_frames_data_rear.push_back(saved_frames_data[i]);
+                            }
+                            saved_frames_data.clear();
+                            late_data_front == false;
+                        }
+                        else if (late_data_rear == true)
+                        {
+                            for (unsigned i = 0; i < saved_frames_data.size(); i++)
+                            {
+                                temp_frames_data_front.push_back(saved_frames_data[i]);
+                            }
+                            saved_frames_data.clear();
+                            late_data_rear == false;
+                        }
 
                         for (unsigned int iPlate = 0; iPlate < nCount; iPlate++) //loop on force plates
                         {
@@ -493,7 +518,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 nUnloadedFramesFront += 1;
                                                 nUnloadedFrames = nUnloadedFramesFront;
                                             }
-                                            else if (iPlate == 1){
+                                            else if (iPlate == 1) {
                                                 nUnloadedFramesRear += 1;
                                                 nUnloadedFrames = nUnloadedFramesRear;
                                             }
@@ -551,13 +576,13 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                 if (plateON[iPlate] == true)
                                                 {
-                                                    if (forces[2][iForce] > 20) 
+                                                    if (forces[2][iForce] > 20)
                                                     {
                                                         cop[0][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[0][iForce] - moments[1][iForce]) / forces[2][iForce]) + (FP_params[iPlate][0] / 1000)) * 1000; //((ORIGIN[Z] * Force[X] - M[Y]) / Force[Z]) + ORIGIN[X]
                                                         cop[1][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[1][iForce] + moments[0][iForce]) / forces[2][iForce]) + (FP_params[iPlate][1] / 1000)) * 1000; //((ORIGIN[Z] * Force[Y] + M[X]) / Force[Z]) + ORIGIN[Y]
                                                         cop[2][iForce] = 0.0f; //cop Z stays O
                                                     }
-                                                    else 
+                                                    else
                                                     {
                                                         cop[0][iForce] = 0.0f;
                                                         cop[0][iForce] = 0.0f;
@@ -618,22 +643,22 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                     assignRearToRight = false;
                                                 }
                                                 FoffR = false;
-                                                nFramesOffR = 0;               
+                                                nFramesOffR = 0;
                                             }
                                         }
 
                                     }
 
-                                    
+
                                     //TODO CORRECTIONS UNITES COP ET MOMENTS
 
                                     if (iPlate == 2) //Right plate
                                     {
-                                        if (assignFrontToRight == true  && assignRearToRight == true)
+                                        if (assignFrontToRight == true && assignRearToRight == true)
                                         {
-                                            if (temp_frames_data_front.size() >= std::min(nForceCountFront,nForceCountRear) && temp_frames_data_rear.size() >= std::min(nForceCountFront, nForceCountRear))
+                                            if (temp_frames_data_front.size() >= std::min(nForceCountFront, nForceCountRear) && temp_frames_data_rear.size() >= std::min(nForceCountFront, nForceCountRear))
                                             {
-                                                for (unsigned int iForce = 0; iForce < std::min(nForceCountFront, nForceCountRear); iForce++) //loop over force frames
+                                                for (unsigned int iForce = 0; iForce < std::min(temp_frames_data_front.size(), temp_frames_data_rear.size()); iForce++) //loop over force frames
                                                 {
 
                                                     float f_x = temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0];
@@ -650,9 +675,21 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                     frames_data_right.push_back(fdata);
                                                 }
-                                            }  
+
+                                                // Detect if one frames_data vector is bigger and how much
+                                                if (temp_frames_data_front.size() > temp_frames_data_rear.size())
+                                                {
+                                                    late_data_rear = true;
+                                                    frame_diff = temp_frames_data_front.size() - temp_frames_data_rear.size();
+                                                }
+                                                else if (temp_frames_data_front.size() < temp_frames_data_rear.size())
+                                                {
+                                                    late_data_front = true;
+                                                    frame_diff = temp_frames_data_rear.size() - temp_frames_data_front.size();
+                                                }
+                                            }
                                         }
-                                        else if(assignFrontToRight == true)
+                                        else if (assignFrontToRight == true)
                                         {
                                             if (temp_frames_data_front.size() >= nForceCountFront)
                                             {
@@ -672,7 +709,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                     frames_data_right.push_back(fdata);
                                                 }
-                                            }  
+                                            }
                                         }
                                         else if (assignRearToRight == true)
                                         {
@@ -694,9 +731,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                     frames_data_right.push_back(fdata);
                                                 }
-                                            } 
+                                            }
                                         }
-                                        else 
+                                        else
                                         {
                                             for (unsigned int iForce = 0; iForce < std::min(nForceCountFront, nForceCountRear); iForce++) //loop over force frames
                                             {
@@ -705,7 +742,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 frames_data_right.push_back(fdata);
                                             }
                                         }
-                                        
+
                                     }
 
 
@@ -715,7 +752,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                         {
                                             if (temp_frames_data_front.size() >= std::min(nForceCountFront, nForceCountRear) && temp_frames_data_rear.size() >= std::min(nForceCountFront, nForceCountRear))
                                             {
-                                                for (unsigned int iForce = 0; iForce < std::min(nForceCountFront, nForceCountRear); iForce++) //loop over force frames
+                                                for (unsigned int iForce = 0; iForce < std::min(temp_frames_data_front.size(), temp_frames_data_rear.size()); iForce++) //loop over force frames
                                                 {
 
                                                     float f_x = temp_frames_data_front[iForce][0] + temp_frames_data_rear[iForce][0];
@@ -732,7 +769,19 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                     frames_data_left.push_back(fdata);
                                                 }
-                                            } 
+
+                                                // Detect if one frames_data vector is bigger and how much
+                                                if (temp_frames_data_front.size() > temp_frames_data_rear.size())
+                                                {
+                                                    late_data_rear = true;
+                                                    frame_diff = temp_frames_data_front.size() - temp_frames_data_rear.size();
+                                                }
+                                                else if (temp_frames_data_front.size() < temp_frames_data_rear.size())
+                                                {
+                                                    late_data_front = true;
+                                                    frame_diff = temp_frames_data_rear.size() - temp_frames_data_front.size();
+                                                }
+                                            }
                                         }
                                         else if (assignFrontToRight == false)
                                         {
@@ -755,7 +804,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                     frames_data_left.push_back(fdata);
                                                 }
-                                            }  
+                                            }
                                         }
                                         else if (assignRearToRight == false)
                                         {
@@ -778,7 +827,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                     frames_data_left.push_back(fdata);
                                                 }
-                                            }  
+                                            }
                                         }
                                         else
                                         {
@@ -802,11 +851,26 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                 }
                             }
                         }
+                        // save data in case of difference between sizes
+                        if (late_data_front == true)
+                        {
+                            for (int i = frame_diff; i > 0; i--)
+                            {
+                                saved_frames_data.push_back(temp_frames_data_rear[temp_frames_data_rear.size() - i]);
+                            }
+                        }
+                        if (late_data_rear == true)
+                        {
+                            for (int i = frame_diff; i > 0; i--)
+                            {
+                                saved_frames_data.push_back(temp_frames_data_front[temp_frames_data_rear.size() - i]);
+                            }
+                        }
                         temp_frames_data_front.clear();
                         temp_frames_data_rear.clear();
-                    }   
+                    }
                 }
-            }    
+            }
         }
     }
     catch (std::exception& e)
@@ -1023,17 +1087,17 @@ qd_call_status qd_read_samples(qd_sample_push_fn callback)
     }
     // Process frames_data_right
     if (!frames_data_right.empty()) {
-		const auto frames_to_process_right = static_cast<std::size_t>(frames_data_right.size());
+        const auto frames_to_process_right = static_cast<std::size_t>(frames_data_right.size());
 
-		const auto& fdevice = force_device_definitions[2];
-		push_samples<std::float_t>(callback, fdevice, g_pushed_samples_right, frames_to_process_right, frames_data_right);
+        const auto& fdevice = force_device_definitions[2];
+        push_samples<std::float_t>(callback, fdevice, g_pushed_samples_right, frames_to_process_right, frames_data_right);
 
-		g_pushed_samples_right += frames_to_process_right;
+        g_pushed_samples_right += frames_to_process_right;
 
-		frames_data_mutex.lock();  // Lock before modifying shared data
-		frames_data_right.erase(frames_data_right.begin(), frames_data_right.begin() + frames_to_process_right);
-		frames_data_mutex.unlock();  // Unlock after modifying shared data
-	}
+        frames_data_mutex.lock();  // Lock before modifying shared data
+        frames_data_right.erase(frames_data_right.begin(), frames_data_right.begin() + frames_to_process_right);
+        frames_data_mutex.unlock();  // Unlock after modifying shared data
+    }
     // Process frames_data_left
     if (!frames_data_left.empty()) {
         const auto frames_to_process_left = static_cast<std::size_t>(frames_data_left.size());
