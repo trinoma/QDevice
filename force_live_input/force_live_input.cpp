@@ -372,7 +372,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                 temp_frames_data_rear.push_back(saved_frames_data[i]);
                             }
                             saved_frames_data.clear();
-                            late_data_front == false;
+                            late_data_front = false;
                         }
                         else if (late_data_rear == true)
                         {
@@ -381,7 +381,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                 temp_frames_data_front.push_back(saved_frames_data[i]);
                             }
                             saved_frames_data.clear();
-                            late_data_rear == false;
+                            late_data_rear = false;
                         }
 
                         for (unsigned int iPlate = 0; iPlate < nCount; iPlate++) //loop on force plates
