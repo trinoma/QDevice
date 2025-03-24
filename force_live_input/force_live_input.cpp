@@ -190,7 +190,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
         bool dataAvailable = false;
         bool streamFrames = false;
-        unsigned short udpPort = 6734;
+        unsigned short udpPort = 0; //6734; if 0, then TCP is used
 
         const char components[256] = "Force 6deuler ";
         const char* Treadmill6DOF = "Treadmill";
