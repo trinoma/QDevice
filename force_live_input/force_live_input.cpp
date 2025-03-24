@@ -863,7 +863,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                         {
                             for (int i = frame_diff; i > 0; i--)
                             {
-                                saved_frames_data.push_back(temp_frames_data_front[temp_frames_data_rear.size() - i]);
+                                saved_frames_data.push_back(temp_frames_data_front[temp_frames_data_front.size() - i]);
                             }
                         }
                         temp_frames_data_front.clear();
