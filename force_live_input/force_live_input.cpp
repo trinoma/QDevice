@@ -523,18 +523,18 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 nUnloadedFrames = nUnloadedFramesRear;
                                             }
                                             if (nUnloadedFrames > 2) { // first and last frame not taken into account for mean computation
-                                                unloadedForceBaseline[iPlate][0] = (prevForceMean[iPlate][0] + nUnloadedFrames * unloadedForceBaseline[iPlate][0]) / (nUnloadedFrames + 1);
-                                                unloadedForceBaseline[iPlate][1] = (prevForceMean[iPlate][1] + nUnloadedFrames * unloadedForceBaseline[iPlate][1]) / (nUnloadedFrames + 1);
-                                                unloadedForceBaseline[iPlate][2] = (prevForceMean[iPlate][2] + nUnloadedFrames * unloadedForceBaseline[iPlate][2]) / (nUnloadedFrames + 1);
+                                                unloadedForceBaseline[iPlate][0] = (prevForceMean[iPlate][0] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][0]) / (nUnloadedFrames - 1);
+                                                unloadedForceBaseline[iPlate][1] = (prevForceMean[iPlate][1] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][1]) / (nUnloadedFrames - 1);
+                                                unloadedForceBaseline[iPlate][2] = (prevForceMean[iPlate][2] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][2]) / (nUnloadedFrames - 1);
 
 
                                                 forceBaseline[iPlate][0] = unloadedForceBaseline[iPlate][0];
                                                 forceBaseline[iPlate][1] = unloadedForceBaseline[iPlate][1];
                                                 forceBaseline[iPlate][2] = unloadedForceBaseline[iPlate][2];
 
-                                                unloadedMomentBaseline[iPlate][0] = (prevMomentMean[iPlate][0] + nUnloadedFrames * unloadedMomentBaseline[iPlate][0]) / (nUnloadedFrames + 1);
-                                                unloadedMomentBaseline[iPlate][1] = (prevMomentMean[iPlate][1] + nUnloadedFrames * unloadedMomentBaseline[iPlate][1]) / (nUnloadedFrames + 1);
-                                                unloadedMomentBaseline[iPlate][2] = (prevMomentMean[iPlate][2] + nUnloadedFrames * unloadedMomentBaseline[iPlate][2]) / (nUnloadedFrames + 1);
+                                                unloadedMomentBaseline[iPlate][0] = (prevMomentMean[iPlate][0] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][0]) / (nUnloadedFrames - 1);
+                                                unloadedMomentBaseline[iPlate][1] = (prevMomentMean[iPlate][1] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][1]) / (nUnloadedFrames - 1);
+                                                unloadedMomentBaseline[iPlate][2] = (prevMomentMean[iPlate][2] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][2]) / (nUnloadedFrames - 1);
 
                                                 momentBaseline[iPlate][0] = unloadedMomentBaseline[iPlate][0];
                                                 momentBaseline[iPlate][1] = unloadedMomentBaseline[iPlate][1];
