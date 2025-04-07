@@ -175,6 +175,7 @@ namespace
     }
 
     //hardcoded coefs for 1000Hz an cut-off of 20Hz
+    //Method for event detection on GRF from Hendershot 2016
     std::vector<float> lowpass_butterworth_4th(const std::vector<float>& input) {
         const std::vector<double> b = {
             1.92935567e-07, 7.71742268e-07, 1.15761340e-06,
