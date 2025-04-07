@@ -52,7 +52,9 @@ namespace
         float position[3];
         float rotation[3];
         float width, length, height;
+        float threshold;
         std::vector<force_plate_channel> channels;
+        
     };
 
     std::vector<force_device> force_device_definitions
@@ -62,6 +64,7 @@ namespace
             { 0.0f, 0.0f, 0.0f },
             { 0.0f, 0.0f, 0.0f },
             0.635f, 0.6223f, 0.0f,
+            20.0f,
             {
                 { "Force X", qd_channel_unit_newtons },
                 { "Force Y", qd_channel_unit_newtons },
@@ -71,7 +74,7 @@ namespace
                 { "Moment Z", qd_channel_unit_newton_meters },
                 { "Application X", qd_channel_unit_millimeters },
                 { "Application Y", qd_channel_unit_millimeters },
-                { "Application Z", qd_channel_unit_millimeters }
+                { "Application Z", qd_channel_unit_millimeters },
             }
         },
         {
@@ -79,6 +82,7 @@ namespace
             { 0.0f, 0.0f, 0.0f },
             { 0.0f, 0.0f, 0.0f },
             0.635f, 0.6223f, 0.0f,
+            20.0f,
             {
                 { "Force X", qd_channel_unit_newtons },
                 { "Force Y", qd_channel_unit_newtons },
@@ -88,7 +92,7 @@ namespace
                 { "Moment Z", qd_channel_unit_newton_meters },
                 { "Application X", qd_channel_unit_millimeters },
                 { "Application Y", qd_channel_unit_millimeters },
-                { "Application Z", qd_channel_unit_millimeters }
+                { "Application Z", qd_channel_unit_millimeters },
             }
         },
         {
@@ -96,6 +100,7 @@ namespace
             { 0.0f, 0.0f, 0.0f },
             { 0.0f, 0.0f, 0.0f },
             0.635f, 1.2466f, 0.0f,
+            20.0f,
             {
                 { "Force X", qd_channel_unit_newtons },
                 { "Force Y", qd_channel_unit_newtons },
@@ -105,7 +110,7 @@ namespace
                 { "Moment Z", qd_channel_unit_newton_meters },
                 { "Application X", qd_channel_unit_millimeters },
                 { "Application Y", qd_channel_unit_millimeters },
-                { "Application Z", qd_channel_unit_millimeters }
+                { "Application Z", qd_channel_unit_millimeters },
             }
         },
         {
@@ -113,6 +118,7 @@ namespace
             { 0.0f, 0.0f, 0.0f },
             { 0.0f, 0.0f, 0.0f },
             0.635f, 1.2466f, 0.0f,
+            20.0f,
             {
                 { "Force X", qd_channel_unit_newtons },
                 { "Force Y", qd_channel_unit_newtons },
@@ -122,7 +128,7 @@ namespace
                 { "Moment Z", qd_channel_unit_newton_meters },
                 { "Application X", qd_channel_unit_millimeters },
                 { "Application Y", qd_channel_unit_millimeters },
-                { "Application Z", qd_channel_unit_millimeters }
+                { "Application Z", qd_channel_unit_millimeters },
             }
         }
     };
@@ -165,6 +171,7 @@ namespace
         ret.properties.data[10] = QDevice::Utilities::create_property("Position X", false, qd_property_type_float32, std::to_string(fdevice.position[0]), "0", "");
         ret.properties.data[11] = QDevice::Utilities::create_property("Position Y", false, qd_property_type_float32, std::to_string(fdevice.position[1]), "0", "");
         ret.properties.data[12] = QDevice::Utilities::create_property("Position Z", false, qd_property_type_float32, std::to_string(fdevice.position[2]), "0", "");
+        ret.properties.data[13] = QDevice::Utilities::create_property("Force Threshold", false, qd_property_type_float32, std::to_string(fdevice.threshold), "0", "");
 
         for (std::size_t c = 0; c < fdevice.channels.size(); c++)
         {
@@ -176,7 +183,7 @@ namespace
 }
 
 
-void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data_front, std::vector< std::array<float, 9> >& frames_data_rear, std::vector< std::array<float, 9> >& frames_data_right, std::vector< std::array<float, 9> >& frames_data_left)
+void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& frames_data_front, std::vector< std::array<float, 9> >& frames_data_rear, std::vector< std::array<float, 9> >& frames_data_right, std::vector< std::array<float, 9> >& frames_data_left, float threshold)
 {
     try {
 
@@ -457,8 +464,8 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     copMean[1] = copSum[1] / nForceCount; //Y
                                     copMean[2] = copSum[2] / nForceCount; //Z
 
-                                    if (forceMean[2] < 20) { //if mean Z force on is below 20N
-                                        if (prevForceMean[iPlate][2] > 20) { //if previous frame mean Z force was above 20N (offset threshold)
+                                    if (forceMean[2] < threshold) { //if mean Z force on is below 20N
+                                        if (prevForceMean[iPlate][2] > threshold) { //if previous frame mean Z force was above 20N (offset threshold)
                                             plateON[iPlate] = false;
                                             if (iPlate == 0) { //rear plate foot off
                                                 FoffF = true;
@@ -514,8 +521,8 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             }
                                         }
                                     }
-                                    else if (forceMean[2] > 20) { //if mean Z force on is above 20N
-                                        if (prevForceMean[iPlate][2] < 20) { //if previous frame mean Z force was below 20N (onset threshold)
+                                    else if (forceMean[2] > threshold) { //if mean Z force on is above 20N
+                                        if (prevForceMean[iPlate][2] < threshold) { //if previous frame mean Z force was below 20N (onset threshold)
                                             plateON[iPlate] = true;
                                             if (iPlate == 0) {
                                                 nUnloadedFramesFront = 0;
@@ -612,7 +619,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                                 if (plateON[iPlate] == true)
                                                 {
-                                                    if (forces[2][iForce] > 20)
+                                                    if (forces[2][iForce] > threshold)
                                                     {
                                                         cop[0][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[0][iForce] - moments[1][iForce]) / forces[2][iForce]) + (FP_params[iPlate][0] / 1000)) * 1000; //((ORIGIN[Z] * Force[X] - M[Y]) / Force[Z]) + ORIGIN[X]
                                                         cop[1][iForce] = ((((FP_params[iPlate][2] / 1000) * forces[1][iForce] + moments[0][iForce]) / forces[2][iForce]) + (FP_params[iPlate][1] / 1000)) * 1000; //((ORIGIN[Z] * Force[Y] + M[X]) / Force[Z]) + ORIGIN[Y]
@@ -1031,7 +1038,7 @@ qd_call_status qd_start_streaming()
     g_pushed_samples_left = 0;
 
     rt_running = true;
-    rt_thread = std::thread(update, std::ref(rt_running), std::ref(frames_data_front), std::ref(frames_data_rear), std::ref(frames_data_right), std::ref(frames_data_left));
+    rt_thread = std::thread(update, std::ref(rt_running), std::ref(frames_data_front), std::ref(frames_data_rear), std::ref(frames_data_right), std::ref(frames_data_left),force_device_definitions[0].threshold);
     return { qd_call_status_type_ok, nullptr };
 }
 
