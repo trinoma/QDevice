@@ -173,6 +173,35 @@ namespace
 
         return ret;
     }
+
+    //hardcoded coefs for 1000Hz an cut-off of 20Hz
+    std::vector<float> lowpass_butterworth_4th(const std::vector<float>& input) {
+        const std::vector<double> b = {
+            1.92935567e-07, 7.71742268e-07, 1.15761340e-06,
+            7.71742268e-07, 1.92935567e-07
+        };
+        const std::vector<double> a = {
+            1.0, -3.70566623, 5.17013197, -3.12821715, 0.77428235
+        };
+
+        std::vector<float> output(input.size(), 0.0);
+
+        for (size_t n = 0; n < input.size(); ++n) {
+            // Apply feedforward part
+            for (size_t i = 0; i < b.size(); ++i) {
+                if (n >= i)
+                    output[n] += b[i] * input[n - i];
+            }
+
+            // Apply feedback part
+            for (size_t i = 1; i < a.size(); ++i) {
+                if (n >= i)
+                    output[n] -= a[i] * output[n - i];
+            }
+        }
+
+        return output;
+    }
 }
 
 
@@ -285,6 +314,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         int frame_diff;
 
         std::vector< std::array<float, 9> > saved_frames_data;
+
+        std::vector<float> Z_force_front;
+        std::vector<float> Z_force_rear;
 
         while (running) {
 
@@ -441,6 +473,13 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             copSum[0] += cop[0][iForce];
                                             copSum[1] += cop[1][iForce];
                                             copSum[2] += cop[2][iForce];
+
+                                            if (iPlate == 0) {
+                                                Z_force_front.push_back(sForce.fForceZ);
+                                            }
+                                            else if (iPlate == 1) {
+                                                Z_force_rear.push_back(sForce.fForceZ);
+                                            }
                                         }
                                     }
 
@@ -457,73 +496,74 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     copMean[1] = copSum[1] / nForceCount; //Y
                                     copMean[2] = copSum[2] / nForceCount; //Z
 
-                                    if (forceMean[2] < 20) { //if mean Z force on is below 20N
-                                        if (prevForceMean[iPlate][2] > 20) { //if previous frame mean Z force was above 20N (offset threshold)
-                                            plateON[iPlate] = false;
-                                            if (iPlate == 0) { //rear plate foot off
+
+                                    if (iPlate == 0 && Z_force_front.size() > 15) {
+                                        std::vector<float> Z_force_front_filtered = lowpass_butterworth_4th(Z_force_front);
+                                        for (unsigned int iForce = nForceCount; iForce > (Z_force_front_filtered.size() - nForceCount); iForce--) //loop over force frames
+                                        {
+                                            if (Z_force_front_filtered[iForce] < 20) {
+                                                plateON[iPlate] = false;
                                                 FoffF = true;
-                                            }
-                                            if (iPlate == 1) { //rear plate foot off
-                                                FoffR = true;
-                                            }
 
-                                            // reinitialize factors and baseline at foot off
-                                            if (iPlate == 0 || iPlate == 1) // front/rear plates
-                                            {
-                                                //reinitialize unloaded force baseline to force baseline from the current angle
-                                                if (iPlate == 0){
-                                                    if (angle_baselines_front.contains(treadmillAngle)) {
-                                                        unloadedForceBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][0];
-                                                        unloadedForceBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][1];
-                                                        unloadedForceBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][2];
+                                                if (angle_baselines_front.contains(treadmillAngle)) {
+                                                    unloadedForceBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][0];
+                                                    unloadedForceBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][1];
+                                                    unloadedForceBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][2];
 
-                                                        unloadedMomentBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][3];
-                                                        unloadedMomentBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][4];
-                                                        unloadedMomentBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][5];
-                                                    }
-                                                    else {
-                                                        unloadedForceBaseline[iPlate][0] = 0.0f;
-                                                        unloadedForceBaseline[iPlate][1] = 0.0f;
-                                                        unloadedForceBaseline[iPlate][2] = 0.0f;
-
-                                                        unloadedMomentBaseline[iPlate][0] = 0.0f;
-                                                        unloadedMomentBaseline[iPlate][1] = 0.0f;
-                                                        unloadedMomentBaseline[iPlate][2] = 0.0f;
-                                                    }
+                                                    unloadedMomentBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][3];
+                                                    unloadedMomentBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][4];
+                                                    unloadedMomentBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][5];
                                                 }
-                                                else if (iPlate == 1) {
-                                                    if (angle_baselines_rear.contains(treadmillAngle)) {
-                                                        unloadedForceBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][0];
-                                                        unloadedForceBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][1];
-                                                        unloadedForceBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][2];
+                                                else {
+                                                    unloadedForceBaseline[iPlate][0] = 0.0f;
+                                                    unloadedForceBaseline[iPlate][1] = 0.0f;
+                                                    unloadedForceBaseline[iPlate][2] = 0.0f;
 
-                                                        unloadedMomentBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][3];
-                                                        unloadedMomentBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][4];
-                                                        unloadedMomentBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][5];
-                                                    }
-                                                    else {
-                                                        unloadedForceBaseline[iPlate][0] = 0.0f;
-                                                        unloadedForceBaseline[iPlate][1] = 0.0f;
-                                                        unloadedForceBaseline[iPlate][2] = 0.0f;
-
-                                                        unloadedMomentBaseline[iPlate][0] = 0.0f;
-                                                        unloadedMomentBaseline[iPlate][1] = 0.0f;
-                                                        unloadedMomentBaseline[iPlate][2] = 0.0f;
-                                                    }
+                                                    unloadedMomentBaseline[iPlate][0] = 0.0f;
+                                                    unloadedMomentBaseline[iPlate][1] = 0.0f;
+                                                    unloadedMomentBaseline[iPlate][2] = 0.0f;
                                                 }
                                             }
-                                        }
-                                    }
-                                    else if (forceMean[2] > 20) { //if mean Z force on is above 20N
-                                        if (prevForceMean[iPlate][2] < 20) { //if previous frame mean Z force was below 20N (onset threshold)
-                                            plateON[iPlate] = true;
-                                            if (iPlate == 0) {
+                                            else if (plateON[iPlate] == false && Z_force_front_filtered[iForce] > 20) {
+                                                plateON[iPlate] = true;
                                                 nUnloadedFramesFront = 0;
                                             }
-                                            if (iPlate == 1) { //rear plate foot on
+                                        }
+                                        Z_force_front.erase(Z_force_front.begin(), Z_force_front.begin() + (Z_force_front.size() - nForceCount));
+                                    }
+                                    else if (iPlate == 1 && Z_force_rear.size() > 15) {
+                                        std::vector<float> Z_force_rear_filtered = lowpass_butterworth_4th(Z_force_rear);
+                                        for (unsigned int iForce = nForceCount; iForce > (Z_force_rear_filtered.size() - nForceCount); iForce--) //loop over force frames
+                                        {
+                                            if (Z_force_rear_filtered[iForce] < 20) {
+                                                plateON[iPlate] = false;
+                                                FoffR = true;
+
+                                                if (angle_baselines_rear.contains(treadmillAngle)) {
+                                                    unloadedForceBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][0];
+                                                    unloadedForceBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][1];
+                                                    unloadedForceBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][2];
+
+                                                    unloadedMomentBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][3];
+                                                    unloadedMomentBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][4];
+                                                    unloadedMomentBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][5];
+                                                }
+                                                else {
+                                                    unloadedForceBaseline[iPlate][0] = 0.0f;
+                                                    unloadedForceBaseline[iPlate][1] = 0.0f;
+                                                    unloadedForceBaseline[iPlate][2] = 0.0f;
+
+                                                    unloadedMomentBaseline[iPlate][0] = 0.0f;
+                                                    unloadedMomentBaseline[iPlate][1] = 0.0f;
+                                                    unloadedMomentBaseline[iPlate][2] = 0.0f;
+                                                }
+                                            }
+                                            else if (plateON[iPlate] == false && Z_force_rear_filtered[iForce] > 20) {
+                                                plateON[iPlate] = true;
                                                 nUnloadedFramesRear = 0;
                                             }
                                         }
+                                        Z_force_rear.erase(Z_force_rear.begin(), Z_force_rear.begin() + (Z_force_rear.size() - nForceCount));
                                     }
 
                                     if (iPlate == 0 || iPlate == 1) // front/rear plates
