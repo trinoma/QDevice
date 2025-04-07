@@ -15,6 +15,7 @@
 #include <vector>
 #include <mutex>
 #include <algorithm>
+#include <map>
 
 
 // Undefine the min/max macros to prevent conflicts with std::min()
@@ -241,8 +242,12 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
         bool plateON[4] = { false, false, false, false };
 
+        std::map<float, std::array<float, 6>> angle_baselines_front;
+        std::map<float, std::array<float, 6>> angle_baselines_rear;
+
+        std::array<float, 6>temp_baseline;
+
         float treadmillAngle = 0.0f;
-        float lastTreadmillAngle = 0.0f;
 
         bool assignFrontToRight = true;
         bool assignRearToRight = true;
@@ -253,17 +258,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         unsigned int nUnloadedFramesFront = 0;
         unsigned int nUnloadedFramesRear = 0;
         unsigned int nUnloadedFrames;
-
-        //force and moment angle offset correction factor
-        float inclineForceFactor[2][3] = {
-            {0.0f, -8.0f, 0.0f},
-            {0.0f, -8.0f, 0.0f},
-        };
-
-        float inclineMomentFactor[2][3] = {
-            {0.0f, -8.0f, 0.0f},
-            {0.0f, -8.0f, 0.0f},
-        };
 
         //force and moment baseline for front and rear plates
         float forceBaseline[2][3] = {
@@ -347,7 +341,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                 if (pTmpStr != nullptr && strcmp(pTmpStr, Treadmill6DOF) == 0)
                                 {
-                                    treadmillAngle = -fAng2;
+                                    treadmillAngle = roundf(10 * -fAng2)/ 10; //to have float with format 0.0
                                     break;
                                 }
                             }
@@ -476,22 +470,47 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             // reinitialize factors and baseline at foot off
                                             if (iPlate == 0 || iPlate == 1) // front/rear plates
                                             {
-                                                inclineForceFactor[iPlate][0] = 0.0f;
-                                                inclineForceFactor[iPlate][1] = -8.0f;
-                                                inclineForceFactor[iPlate][2] = 0.0f;
+                                                //reinitialize unloaded force baseline to force baseline from the current angle
+                                                if (iPlate == 0){
+                                                    if (angle_baselines_front.contains(treadmillAngle)) {
+                                                        unloadedForceBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][0];
+                                                        unloadedForceBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][1];
+                                                        unloadedForceBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][2];
 
-                                                inclineMomentFactor[iPlate][0] = 0.0f;
-                                                inclineMomentFactor[iPlate][1] = 0.0f;
-                                                inclineMomentFactor[iPlate][2] = 0.0f;
+                                                        unloadedMomentBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][3];
+                                                        unloadedMomentBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][4];
+                                                        unloadedMomentBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][5];
+                                                    }
+                                                    else {
+                                                        unloadedForceBaseline[iPlate][0] = 0.0f;
+                                                        unloadedForceBaseline[iPlate][1] = 0.0f;
+                                                        unloadedForceBaseline[iPlate][2] = 0.0f;
 
-                                                //reinitialize unloaded force baseline to force baseline to unsure previous force baseline saved value does not affect next value badly in the average computation
-                                                unloadedForceBaseline[iPlate][0] = forceBaseline[iPlate][0];
-                                                unloadedForceBaseline[iPlate][1] = forceBaseline[iPlate][1];
-                                                unloadedForceBaseline[iPlate][2] = forceBaseline[iPlate][2];
+                                                        unloadedMomentBaseline[iPlate][0] = 0.0f;
+                                                        unloadedMomentBaseline[iPlate][1] = 0.0f;
+                                                        unloadedMomentBaseline[iPlate][2] = 0.0f;
+                                                    }
+                                                }
+                                                else if (iPlate == 1) {
+                                                    if (angle_baselines_rear.contains(treadmillAngle)) {
+                                                        unloadedForceBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][0];
+                                                        unloadedForceBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][1];
+                                                        unloadedForceBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][2];
 
-                                                unloadedMomentBaseline[iPlate][0] = momentBaseline[iPlate][0];
-                                                unloadedMomentBaseline[iPlate][1] = momentBaseline[iPlate][1];
-                                                unloadedMomentBaseline[iPlate][2] = momentBaseline[iPlate][2];
+                                                        unloadedMomentBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][3];
+                                                        unloadedMomentBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][4];
+                                                        unloadedMomentBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][5];
+                                                    }
+                                                    else {
+                                                        unloadedForceBaseline[iPlate][0] = 0.0f;
+                                                        unloadedForceBaseline[iPlate][1] = 0.0f;
+                                                        unloadedForceBaseline[iPlate][2] = 0.0f;
+
+                                                        unloadedMomentBaseline[iPlate][0] = 0.0f;
+                                                        unloadedMomentBaseline[iPlate][1] = 0.0f;
+                                                        unloadedMomentBaseline[iPlate][2] = 0.0f;
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -527,39 +546,56 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 unloadedForceBaseline[iPlate][1] = (prevForceMean[iPlate][1] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][1]) / (nUnloadedFrames - 1);
                                                 unloadedForceBaseline[iPlate][2] = (prevForceMean[iPlate][2] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][2]) / (nUnloadedFrames - 1);
 
-
-                                                forceBaseline[iPlate][0] = unloadedForceBaseline[iPlate][0];
-                                                forceBaseline[iPlate][1] = unloadedForceBaseline[iPlate][1];
-                                                forceBaseline[iPlate][2] = unloadedForceBaseline[iPlate][2];
-
                                                 unloadedMomentBaseline[iPlate][0] = (prevMomentMean[iPlate][0] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][0]) / (nUnloadedFrames - 1);
                                                 unloadedMomentBaseline[iPlate][1] = (prevMomentMean[iPlate][1] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][1]) / (nUnloadedFrames - 1);
                                                 unloadedMomentBaseline[iPlate][2] = (prevMomentMean[iPlate][2] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][2]) / (nUnloadedFrames - 1);
 
-                                                momentBaseline[iPlate][0] = unloadedMomentBaseline[iPlate][0];
-                                                momentBaseline[iPlate][1] = unloadedMomentBaseline[iPlate][1];
-                                                momentBaseline[iPlate][2] = unloadedMomentBaseline[iPlate][2];
+                                                temp_baseline = { {unloadedForceBaseline[iPlate][0],
+                                                    unloadedForceBaseline[iPlate][1],
+                                                    unloadedForceBaseline[iPlate][2],
+                                                    unloadedMomentBaseline[iPlate][0],
+                                                    unloadedMomentBaseline[iPlate][1],
+                                                    unloadedMomentBaseline[iPlate][2]
+                                                    } };
 
-                                                if (abs(treadmillAngle) > 0.5f)
-                                                {
-                                                    inclineForceFactor[iPlate][0] = ((prevForceMean[iPlate][0] / treadmillAngle) + inclineForceFactor[iPlate][0]) / 2;
-                                                    inclineForceFactor[iPlate][1] = ((prevForceMean[iPlate][1] / treadmillAngle) + inclineForceFactor[iPlate][1]) / 2;
-                                                    inclineForceFactor[iPlate][2] = ((prevForceMean[iPlate][2] / treadmillAngle) + inclineForceFactor[iPlate][2]) / 2;
-                                                    inclineMomentFactor[iPlate][0] = ((prevMomentMean[iPlate][0] / treadmillAngle) + inclineMomentFactor[iPlate][0]) / 2;
-                                                    inclineMomentFactor[iPlate][1] = ((prevMomentMean[iPlate][1] / treadmillAngle) + inclineMomentFactor[iPlate][1]) / 2;
-                                                    inclineMomentFactor[iPlate][2] = ((prevMomentMean[iPlate][2] / treadmillAngle) + inclineMomentFactor[iPlate][2]) / 2;
+                                                if (iPlate == 0) {
+                                                    angle_baselines_front[treadmillAngle] = temp_baseline;
                                                 }
-                                                lastTreadmillAngle = treadmillAngle;
+                                                else if (iPlate == 1) {
+                                                    angle_baselines_rear[treadmillAngle] = temp_baseline;
+                                                }
+
                                             }
                                         }
                                         else {
-                                            forceBaseline[iPlate][0] = unloadedForceBaseline[iPlate][0] + inclineForceFactor[iPlate][0] * (treadmillAngle - lastTreadmillAngle);
-                                            forceBaseline[iPlate][1] = unloadedForceBaseline[iPlate][1] + inclineForceFactor[iPlate][1] * (treadmillAngle - lastTreadmillAngle);
-                                            forceBaseline[iPlate][2] = unloadedForceBaseline[iPlate][2] + inclineForceFactor[iPlate][2] * (treadmillAngle - lastTreadmillAngle);
+                                            // To modify with saved value from the current angle baseline
+                                            if (iPlate == 0 && angle_baselines_front.contains(treadmillAngle)) {
+                                                forceBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][0];
+                                                forceBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][1];
+                                                forceBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][2];
 
-                                            momentBaseline[iPlate][0] = unloadedMomentBaseline[iPlate][0] + inclineMomentFactor[iPlate][0] * (treadmillAngle - lastTreadmillAngle);
-                                            momentBaseline[iPlate][1] = unloadedMomentBaseline[iPlate][1] + inclineMomentFactor[iPlate][1] * (treadmillAngle - lastTreadmillAngle);
-                                            momentBaseline[iPlate][2] = unloadedMomentBaseline[iPlate][2] + inclineMomentFactor[iPlate][2] * (treadmillAngle - lastTreadmillAngle);
+                                                momentBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][3];
+                                                momentBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][4];
+                                                momentBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][5];
+                                            }
+                                            else if (iPlate == 1 && angle_baselines_rear.contains(treadmillAngle)) {
+                                                forceBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][0];
+                                                forceBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][1];
+                                                forceBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][2];
+
+                                                momentBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][3];
+                                                momentBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][4];
+                                                momentBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][5];
+                                            }
+                                            else {
+                                                forceBaseline[iPlate][0] = unloadedForceBaseline[iPlate][0];
+                                                forceBaseline[iPlate][1] = unloadedForceBaseline[iPlate][1];
+                                                forceBaseline[iPlate][2] = unloadedForceBaseline[iPlate][2];
+
+                                                momentBaseline[iPlate][0] = unloadedMomentBaseline[iPlate][0];
+                                                momentBaseline[iPlate][1] = unloadedMomentBaseline[iPlate][1];
+                                                momentBaseline[iPlate][2] = unloadedMomentBaseline[iPlate][2];
+                                            }
                                         }
 
                                         //assign force/moment/cop values
