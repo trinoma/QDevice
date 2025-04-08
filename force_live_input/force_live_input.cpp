@@ -176,29 +176,36 @@ namespace
 
     //hardcoded coefs for 1000Hz an cut-off of 20Hz
     //Method for event detection on GRF from Hendershot 2016
+    // Define biquad section
+    struct Biquad {
+        double b0, b1, b2;
+        double a1, a2;
+        double z1 = 0, z2 = 0;
+
+        double process(double x) {
+            double y = b0 * x + z1;
+            z1 = b1 * x - a1 * y + z2;
+            z2 = b2 * x - a2 * y;
+            return y;
+        }
+    };
+
     std::vector<float> lowpass_butterworth_4th(const std::vector<float>& input) {
-        const std::vector<double> b = {
-            1.92935567e-07, 7.71742268e-07, 1.15761340e-06,
-            7.71742268e-07, 1.92935567e-07
-        };
-        const std::vector<double> a = {
-            1.0, -3.70566623, 5.17013197, -3.12821715, 0.77428235
-        };
+        // 4th order = 2 biquad sections
+        std::array<Biquad, 2> filter = { {
+        { 0.04658291, 0.18633163, 0.27949744, 0.18633163, 0.04658291 },
+        { 1., - 0.7820952,   0.67997853, - 0.1826757,   0.03011888 }
+        } };
 
-        std::vector<float> output(input.size(), 0.0);
+        std::vector<float> output;
+        output.reserve(input.size());
 
-        for (size_t n = 0; n < input.size(); ++n) {
-            // Apply feedforward part
-            for (size_t i = 0; i < b.size(); ++i) {
-                if (n >= i)
-                    output[n] += b[i] * input[n - i];
+        for (float sample : input) {
+            float y = sample;
+            for (auto& biquad : filter) {
+                y = biquad.process(y);
             }
-
-            // Apply feedback part
-            for (size_t i = 1; i < a.size(); ++i) {
-                if (n >= i)
-                    output[n] -= a[i] * output[n - i];
-            }
+            output.push_back(y);
         }
 
         return output;
@@ -216,7 +223,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         const char           serverAddr[] = "127.0.0.1";
         const unsigned short basePort = 22222;
         const int            majorVersion = 1;
-        const int            minorVersion = 19;
+        const int            minorVersion = 25;
         const bool           bigEndian = false;
 
         bool dataAvailable = false;
@@ -500,9 +507,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                     if (iPlate == 0 && Z_force_front.size() > 15) {
                                         std::vector<float> Z_force_front_filtered = lowpass_butterworth_4th(Z_force_front);
-                                        for (unsigned int iForce = nForceCount; iForce > (Z_force_front_filtered.size() - nForceCount); iForce--) //loop over force frames
+                                        for (unsigned int iForce = Z_force_front_filtered.size(); iForce > (Z_force_front_filtered.size() - nForceCount); iForce--) //loop over force frames
                                         {
-                                            if (Z_force_front_filtered[iForce] < 20) {
+                                            if (Z_force_front_filtered[iForce-1] < 20) {
                                                 plateON[iPlate] = false;
                                                 FoffF = true;
 
@@ -534,9 +541,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     }
                                     else if (iPlate == 1 && Z_force_rear.size() > 15) {
                                         std::vector<float> Z_force_rear_filtered = lowpass_butterworth_4th(Z_force_rear);
-                                        for (unsigned int iForce = nForceCount; iForce > (Z_force_rear_filtered.size() - nForceCount); iForce--) //loop over force frames
+                                        for (unsigned int iForce = Z_force_rear_filtered.size(); iForce > (Z_force_rear_filtered.size() - nForceCount); iForce--) //loop over force frames
                                         {
-                                            if (Z_force_rear_filtered[iForce] < 20) {
+                                            if (Z_force_rear_filtered[iForce-1] < 20) {
                                                 plateON[iPlate] = false;
                                                 FoffR = true;
 
