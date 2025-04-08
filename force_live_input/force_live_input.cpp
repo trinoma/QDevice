@@ -505,73 +505,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     copMean[2] = copSum[2] / nForceCount; //Z
 
 
-<<<<<<< Updated upstream
-                                    if (iPlate == 0 && Z_force_front.size() > 15) {
-                                        std::vector<float> Z_force_front_filtered = lowpass_butterworth_4th(Z_force_front);
-                                        for (unsigned int iForce = Z_force_front_filtered.size(); iForce > (Z_force_front_filtered.size() - nForceCount); iForce--) //loop over force frames
-                                        {
-                                            if (Z_force_front_filtered[iForce-1] < 20) {
-                                                plateON[iPlate] = false;
-                                                FoffF = true;
-
-                                                if (angle_baselines_front.contains(treadmillAngle)) {
-                                                    unloadedForceBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][0];
-                                                    unloadedForceBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][1];
-                                                    unloadedForceBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][2];
-
-                                                    unloadedMomentBaseline[iPlate][0] = angle_baselines_front[treadmillAngle][3];
-                                                    unloadedMomentBaseline[iPlate][1] = angle_baselines_front[treadmillAngle][4];
-                                                    unloadedMomentBaseline[iPlate][2] = angle_baselines_front[treadmillAngle][5];
-                                                }
-                                                else {
-                                                    unloadedForceBaseline[iPlate][0] = 0.0f;
-                                                    unloadedForceBaseline[iPlate][1] = 0.0f;
-                                                    unloadedForceBaseline[iPlate][2] = 0.0f;
-
-                                                    unloadedMomentBaseline[iPlate][0] = 0.0f;
-                                                    unloadedMomentBaseline[iPlate][1] = 0.0f;
-                                                    unloadedMomentBaseline[iPlate][2] = 0.0f;
-                                                }
-                                            }
-                                            else if (plateON[iPlate] == false && Z_force_front_filtered[iForce] > 20) {
-                                                plateON[iPlate] = true;
-                                                nUnloadedFramesFront = 0;
-                                            }
-                                        }
-                                        Z_force_front.erase(Z_force_front.begin(), Z_force_front.begin() + (Z_force_front.size() - nForceCount));
-                                    }
-                                    else if (iPlate == 1 && Z_force_rear.size() > 15) {
-                                        std::vector<float> Z_force_rear_filtered = lowpass_butterworth_4th(Z_force_rear);
-                                        for (unsigned int iForce = Z_force_rear_filtered.size(); iForce > (Z_force_rear_filtered.size() - nForceCount); iForce--) //loop over force frames
-                                        {
-                                            if (Z_force_rear_filtered[iForce-1] < 20) {
-                                                plateON[iPlate] = false;
-                                                FoffR = true;
-
-                                                if (angle_baselines_rear.contains(treadmillAngle)) {
-                                                    unloadedForceBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][0];
-                                                    unloadedForceBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][1];
-                                                    unloadedForceBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][2];
-
-                                                    unloadedMomentBaseline[iPlate][0] = angle_baselines_rear[treadmillAngle][3];
-                                                    unloadedMomentBaseline[iPlate][1] = angle_baselines_rear[treadmillAngle][4];
-                                                    unloadedMomentBaseline[iPlate][2] = angle_baselines_rear[treadmillAngle][5];
-                                                }
-                                                else {
-                                                    unloadedForceBaseline[iPlate][0] = 0.0f;
-                                                    unloadedForceBaseline[iPlate][1] = 0.0f;
-                                                    unloadedForceBaseline[iPlate][2] = 0.0f;
-
-                                                    unloadedMomentBaseline[iPlate][0] = 0.0f;
-                                                    unloadedMomentBaseline[iPlate][1] = 0.0f;
-                                                    unloadedMomentBaseline[iPlate][2] = 0.0f;
-                                                }
-                                            }
-                                            else if (plateON[iPlate] == false && Z_force_rear_filtered[iForce] > 20) {
-                                                plateON[iPlate] = true;
-                                                nUnloadedFramesRear = 0;
-                                            }
-=======
                                     if (iPlate == 0 && forceMean[2] < 20 && prevForceMean[iPlate][2] > 20) {
                                         plateON[iPlate] = false;
                                         FoffF = true;
@@ -621,9 +554,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             unloadedMomentBaseline[iPlate][0] = 0.0f;
                                             unloadedMomentBaseline[iPlate][1] = 0.0f;
                                             unloadedMomentBaseline[iPlate][2] = 0.0f;
->>>>>>> Stashed changes
                                         }
-                                        Z_force_rear.erase(Z_force_rear.begin(), Z_force_rear.begin() + (Z_force_rear.size() - nForceCount));
                                     }
                                     else if (iPlate == 1 && forceMean[2] > 20 && prevForceMean[iPlate][2] < 20) {
                                         plateON[iPlate] = true;
