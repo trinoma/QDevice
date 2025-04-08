@@ -405,11 +405,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     };
 
                                     float forceSum[3] = { 0.0f, 0.0f , 0.0f };
-                                    float momentSum[3] = { 0.0f, 0.0f , 0.0f };
                                     float copSum[3] = { 0.0f, 0.0f , 0.0f };
 
                                     float forceMean[3] = { 0.0f, 0.0f , 0.0f };
-                                    float momentMean[3] = { 0.0f, 0.0f , 0.0f };
                                     float copMean[3] = { 0.0f, 0.0f , 0.0f };
 
                                     CRTPacket::SForce sForce;
@@ -434,10 +432,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             forceSum[1] += forces[1][iForce];
                                             forceSum[2] += forces[2][iForce];
 
-                                            momentSum[0] += moments[0][iForce];
-                                            momentSum[1] += moments[1][iForce];
-                                            momentSum[2] += moments[2][iForce];
-
                                             copSum[0] += cop[0][iForce];
                                             copSum[1] += cop[1][iForce];
                                             copSum[2] += cop[2][iForce];
@@ -449,14 +443,14 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     forceMean[1] = forceSum[1] / nForceCount; //Y
                                     forceMean[2] = forceSum[2] / nForceCount; //Z
 
-                                    momentMean[0] = momentSum[0] / nForceCount; //X
-                                    momentMean[1] = momentSum[1] / nForceCount; //Y
-                                    momentMean[2] = momentSum[2] / nForceCount; //Z
-
                                     copMean[0] = copSum[0] / nForceCount; //X
                                     copMean[1] = copSum[1] / nForceCount; //Y
                                     copMean[2] = copSum[2] / nForceCount; //Z
 
+                                    //remove baseline from ForceMean
+                                    forceMean[0] -= forceBaseline[iPlate][0];
+                                    forceMean[1] -= forceBaseline[iPlate][1];
+                                    forceMean[2] -= forceBaseline[iPlate][2];
 
                                     if (iPlate == 0 && forceMean[2] < 20 && prevForceMean[iPlate][2] > 20) {
                                         plateON[iPlate] = false;
@@ -868,10 +862,6 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     prevForceMean[iPlate][0] = forceMean[0];
                                     prevForceMean[iPlate][1] = forceMean[1];
                                     prevForceMean[iPlate][2] = forceMean[2];
-
-                                    prevMomentMean[iPlate][0] = momentMean[0];
-                                    prevMomentMean[iPlate][1] = momentMean[1];
-                                    prevMomentMean[iPlate][2] = momentMean[2];
                                 }
                             }
                         }
