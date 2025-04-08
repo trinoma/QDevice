@@ -215,7 +215,9 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         };
 
 
-        float prevForceMean[4][3] = {
+        float prevZForceMean[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+        float prevOriginalForceMean[4][3] = {
             {0.0f, 0.0f, 0.0f},
             {0.0f, 0.0f, 0.0f},
             {0.0f, 0.0f, 0.0f},
@@ -223,6 +225,13 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
         };
 
         float prevMomentMean[4][3] = {
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f}
+        };
+
+        float prevOriginalMomentMean[4][3] = {
             {0.0f, 0.0f, 0.0f},
             {0.0f, 0.0f, 0.0f},
             {0.0f, 0.0f, 0.0f},
@@ -405,10 +414,16 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     };
 
                                     float forceSum[3] = { 0.0f, 0.0f , 0.0f };
+                                    float momentSum[3] = { 0.0f, 0.0f , 0.0f };
                                     float copSum[3] = { 0.0f, 0.0f , 0.0f };
 
-                                    float forceMean[3] = { 0.0f, 0.0f , 0.0f };
-                                    float copMean[3] = { 0.0f, 0.0f , 0.0f };
+                                    float originalForceMean[3] = { 0.0f, 0.0f , 0.0f };
+                                    float originalMomentMean[3] = { 0.0f, 0.0f , 0.0f };
+                                    float originalCOPMean[3] = { 0.0f, 0.0f , 0.0f };
+
+                                    float ZforceMean = 0.0f;
+
+                                    
 
                                     CRTPacket::SForce sForce;
 
@@ -432,6 +447,10 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             forceSum[1] += forces[1][iForce];
                                             forceSum[2] += forces[2][iForce];
 
+                                            momentSum[0] += moments[0][iForce];
+                                            momentSum[1] += moments[1][iForce];
+                                            momentSum[2] += moments[2][iForce];
+
                                             copSum[0] += cop[0][iForce];
                                             copSum[1] += cop[1][iForce];
                                             copSum[2] += cop[2][iForce];
@@ -439,20 +458,30 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                     }
 
                                     //compute mean force and moment over camera frame (as force frame rate is higher than camera rate, there are several force frames per camera frame)
-                                    forceMean[0] = forceSum[0] / nForceCount; //X
-                                    forceMean[1] = forceSum[1] / nForceCount; //Y
-                                    forceMean[2] = forceSum[2] / nForceCount; //Z
+                                    originalForceMean[0] = forceSum[0] / nForceCount; //X
+                                    originalForceMean[1] = forceSum[1] / nForceCount; //Y
+                                    originalForceMean[2] = forceSum[2] / nForceCount; //Z
 
-                                    copMean[0] = copSum[0] / nForceCount; //X
-                                    copMean[1] = copSum[1] / nForceCount; //Y
-                                    copMean[2] = copSum[2] / nForceCount; //Z
+                                    originalMomentMean[0] = momentSum[0] / nForceCount; //X
+                                    originalMomentMean[1] = momentSum[1] / nForceCount; //Y
+                                    originalMomentMean[2] = momentSum[2] / nForceCount; //Z
+
+                                    originalCOPMean[0] = copSum[0] / nForceCount; //X
+                                    originalCOPMean[1] = copSum[1] / nForceCount; //Y
+                                    originalCOPMean[2] = copSum[2] / nForceCount; //Z
 
                                     //remove baseline from ForceMean
-                                    forceMean[0] -= forceBaseline[iPlate][0];
-                                    forceMean[1] -= forceBaseline[iPlate][1];
-                                    forceMean[2] -= forceBaseline[iPlate][2];
+                                    if (iPlate == 0 && angle_baselines_front.contains(treadmillAngle)) {
+                                        ZforceMean = originalForceMean[2] - angle_baselines_front[treadmillAngle][2];
+                                    }else if (iPlate == 1 && angle_baselines_rear.contains(treadmillAngle)) {
+                                        ZforceMean = originalForceMean[2] - angle_baselines_rear[treadmillAngle][2];
+                                    }
+                                    else {
+                                        ZforceMean = originalForceMean[2];
+                                    }
 
-                                    if (iPlate == 0 && forceMean[2] < 20 && prevForceMean[iPlate][2] > 20) {
+
+                                    if (iPlate == 0 && ZforceMean < 20 && prevZForceMean[iPlate] > 20) {
                                         plateON[iPlate] = false;
                                         FoffF = true;
 
@@ -475,12 +504,12 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             unloadedMomentBaseline[iPlate][2] = 0.0f;
                                         }
                                     }
-                                    else if (iPlate == 0 && forceMean[2] > 20 && prevForceMean[iPlate][2] < 20) {
+                                    else if (iPlate == 0 && ZforceMean > 20 && prevZForceMean[iPlate] < 20) {
                                         plateON[iPlate] = true;
                                         nUnloadedFramesFront = 0;
                                     }
 
-                                    if (iPlate == 1 && forceMean[2] < 20 && prevForceMean[iPlate][2] > 20) {
+                                    if (iPlate == 1 && ZforceMean < 20 && prevZForceMean[iPlate] > 20) {
                                         plateON[iPlate] = false;
                                         FoffR = true;
 
@@ -503,7 +532,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             unloadedMomentBaseline[iPlate][2] = 0.0f;
                                         }
                                     }
-                                    else if (iPlate == 1 && forceMean[2] > 20 && prevForceMean[iPlate][2] < 20) {
+                                    else if (iPlate == 1 && ZforceMean > 20 && prevZForceMean[iPlate] < 20) {
                                         plateON[iPlate] = true;
                                         nUnloadedFramesRear = 0;
                                     }
@@ -524,13 +553,13 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                                 nUnloadedFrames = nUnloadedFramesRear;
                                             }
                                             if (nUnloadedFrames > 2) { // first and last frame not taken into account for mean computation
-                                                unloadedForceBaseline[iPlate][0] = (prevForceMean[iPlate][0] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][0]) / (nUnloadedFrames - 1);
-                                                unloadedForceBaseline[iPlate][1] = (prevForceMean[iPlate][1] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][1]) / (nUnloadedFrames - 1);
-                                                unloadedForceBaseline[iPlate][2] = (prevForceMean[iPlate][2] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][2]) / (nUnloadedFrames - 1);
+                                                unloadedForceBaseline[iPlate][0] = (prevOriginalForceMean[iPlate][0] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][0]) / (nUnloadedFrames - 1);
+                                                unloadedForceBaseline[iPlate][1] = (prevOriginalForceMean[iPlate][1] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][1]) / (nUnloadedFrames - 1);
+                                                unloadedForceBaseline[iPlate][2] = (prevOriginalForceMean[iPlate][2] + (nUnloadedFrames - 2) * unloadedForceBaseline[iPlate][2]) / (nUnloadedFrames - 1);
 
-                                                unloadedMomentBaseline[iPlate][0] = (prevMomentMean[iPlate][0] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][0]) / (nUnloadedFrames - 1);
-                                                unloadedMomentBaseline[iPlate][1] = (prevMomentMean[iPlate][1] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][1]) / (nUnloadedFrames - 1);
-                                                unloadedMomentBaseline[iPlate][2] = (prevMomentMean[iPlate][2] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][2]) / (nUnloadedFrames - 1);
+                                                unloadedMomentBaseline[iPlate][0] = (prevOriginalMomentMean[iPlate][0] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][0]) / (nUnloadedFrames - 1);
+                                                unloadedMomentBaseline[iPlate][1] = (prevOriginalMomentMean[iPlate][1] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][1]) / (nUnloadedFrames - 1);
+                                                unloadedMomentBaseline[iPlate][2] = (prevOriginalMomentMean[iPlate][2] + (nUnloadedFrames - 2) * unloadedMomentBaseline[iPlate][2]) / (nUnloadedFrames - 1);
 
                                                 temp_baseline = { {unloadedForceBaseline[iPlate][0],
                                                     unloadedForceBaseline[iPlate][1],
@@ -637,7 +666,7 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
                                             if (nFramesOffF == 3) { //2 frames temporisation from Rear plate foot on before changing force assignment
                                                 for (int i = 0; i < 3; i++) {
                                                     FORposition[0][i] = FORposition[1][i];
-                                                    FORposition[1][i] = copMean[i];
+                                                    FORposition[1][i] = originalCOPMean[i];
                                                 }
                                                 if (FORposition[1][0] - FORposition[0][0] < 0) //Right foot if difference negative (in mediolateral) on X
                                                 {
@@ -859,9 +888,17 @@ void update(std::atomic<bool>& running, std::vector< std::array<float, 9> >& fra
 
                                     }
                                     // saving mean force and moment data for next frame
-                                    prevForceMean[iPlate][0] = forceMean[0];
-                                    prevForceMean[iPlate][1] = forceMean[1];
-                                    prevForceMean[iPlate][2] = forceMean[2];
+                                    prevZForceMean[iPlate] = ZforceMean;
+
+                                    prevOriginalForceMean[iPlate][0] = originalForceMean[0];
+                                    prevOriginalForceMean[iPlate][1] = originalForceMean[1];
+                                    prevOriginalForceMean[iPlate][2] = originalForceMean[2];
+
+                                    prevOriginalMomentMean[iPlate][0] = originalMomentMean[0];
+                                    prevOriginalMomentMean[iPlate][1] = originalMomentMean[1];
+                                    prevOriginalMomentMean[iPlate][2] = originalMomentMean[2];
+
+
                                 }
                             }
                         }
